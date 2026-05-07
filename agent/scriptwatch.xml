@@ -1,16 +1,16 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>ScriptWatch-API</Name>
-  <Repository>scriptwatch-api</Repository>
+  <Name>ScriptWatch</Name>
+  <Repository>scriptwatch-standalone:latest</Repository>
   <Registry/>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <Support/>
   <Project/>
-  <Overview>ScriptWatch central API and web UI. Monitors and remotely triggers scripts on your homelab servers. Requires a PostgreSQL database (set up the community Postgres template first). Agents on each server connect back to this service.</Overview>
+  <Overview>ScriptWatch Standalone central API and web UI. Manages scripts, schedules jobs, and dispatches them to agents without requiring PostgreSQL or Gitea. SQLite data and local script snapshots are stored under /app/data.</Overview>
   <Category>Tools:</Category>
-  <WebUI>http://[IP]:[PORT:8095]</WebUI>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
   <TemplateURL/>
   <Icon/>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
@@ -18,21 +18,35 @@
   <CPUset/>
   <DonateText/>
   <DonateLink/>
-  <Requires>PostgreSQL must be running and accessible before starting this container.</Requires>
+  <Requires>Use a unique Agent Token and Secret Key for every install. Map /app/data to persistent appdata storage.</Requires>
 
-  <!-- Database -->
-  <Config Name="Database URL" Target="DATABASE_URL" Default="postgresql://scriptwatch:yourpassword@192.168.1.10:5432/scriptwatch" Mode="" Description="Full PostgreSQL connection string. Replace the IP, password, and DB name to match your Postgres setup." Type="Variable" Display="always" Required="true" Mask="false">postgresql://scriptwatch:yourpassword@192.168.1.10:5432/scriptwatch</Config>
+  <!-- Storage -->
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/scriptwatch" Mode="rw" Description="Persistent SQLite database and local script snapshot storage." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/scriptwatch</Config>
 
-  <!-- Gitea -->
-  <Config Name="Gitea URL" Target="GITEA_URL" Default="http://192.168.1.10:3000" Mode="" Description="URL of your Gitea instance. Scripts are stored here as versioned files." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:3000</Config>
-  <Config Name="Gitea Token" Target="GITEA_TOKEN" Default="" Mode="" Description="Gitea API token with read/write access to the scriptwatch repo. Generate in Gitea → Settings → Applications." Type="Variable" Display="always" Required="true" Mask="true"/>
-  <Config Name="Gitea Repo Owner" Target="GITEA_REPO_OWNER" Default="adrianoropesa" Mode="" Description="Gitea username that owns the scriptwatch repository." Type="Variable" Display="always" Required="true" Mask="false">adrianoropesa</Config>
-  <Config Name="Gitea Repo Name" Target="GITEA_REPO_NAME" Default="scriptwatch" Mode="" Description="Name of the Gitea repository where scripts are stored." Type="Variable" Display="always" Required="true" Mask="false">scriptwatch</Config>
+  <!-- Database and local script store -->
+  <Config Name="Database URL" Target="DATABASE_URL" Default="sqlite:////app/data/scriptwatch.db" Mode="" Description="SQLite database path inside the container. Keep this default unless you know you need a custom SQLite path." Type="Variable" Display="advanced" Required="true" Mask="false">sqlite:////app/data/scriptwatch.db</Config>
+  <Config Name="Data Directory" Target="DATA_DIR" Default="/app/data" Mode="" Description="Container data directory. This should match the App Data container path." Type="Variable" Display="advanced" Required="true" Mask="false">/app/data</Config>
+  <Config Name="Script Store Directory" Target="SCRIPT_STORE_DIR" Default="/app/data/script-store" Mode="" Description="Local script source and version snapshot directory inside the container." Type="Variable" Display="advanced" Required="true" Mask="false">/app/data/script-store</Config>
+
+  <!-- Public URL -->
+  <Config Name="Base URL" Target="BASE_URL" Default="http://tower:8080" Mode="" Description="URL agents use to reach this ScriptWatch instance. Use your Unraid host IP, hostname, or reverse proxy URL." Type="Variable" Display="always" Required="true" Mask="false">http://tower:8080</Config>
 
   <!-- Security -->
-  <Config Name="Agent Token" Target="AGENT_TOKEN" Default="" Mode="" Description="Shared secret that agents use to authenticate with this API. Generate a long random string and use the same value in every agent's config." Type="Variable" Display="always" Required="true" Mask="true"/>
-  <Config Name="Secret Key" Target="SECRET_KEY" Default="" Mode="" Description="Flask session secret key. Generate a long random string — keep it private." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Agent Token" Target="AGENT_TOKEN" Default="" Mode="" Description="Shared secret agents use to authenticate with this API. Generate a long random value and use the same value in agent configs." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Secret Key" Target="SECRET_KEY" Default="" Mode="" Description="Flask session secret. Generate a long random value and keep it private." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Admin Username" Target="ADMIN_USERNAME" Default="admin" Mode="" Description="Web UI administrator username." Type="Variable" Display="always" Required="true" Mask="false">admin</Config>
+  <Config Name="Admin Password" Target="ADMIN_PASSWORD" Default="" Mode="" Description="Optional initial web UI password. Leave blank to set it from Settings after first launch." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Admin API Token" Target="ADMIN_TOKEN" Default="" Mode="" Description="Optional bearer token for API access. You can also generate this later in Settings." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <!-- Notifications -->
+  <Config Name="ntfy URL" Target="NTFY_URL" Default="" Mode="" Description="Optional ntfy endpoint URL. Leave blank to disable ntfy notifications." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="ntfy Token" Target="NTFY_TOKEN" Default="" Mode="" Description="Optional ntfy access token." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Discord Webhook URL" Target="DISCORD_WEBHOOK_URL" Default="" Mode="" Description="Optional Discord webhook URL. Leave blank to disable Discord notifications." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+
+  <!-- Scheduling -->
+  <Config Name="Missed Run Grace Minutes" Target="MISSED_RUN_GRACE_MINUTES" Default="15" Mode="" Description="Grace period before a scheduled run is considered missed." Type="Variable" Display="advanced" Required="false" Mask="false">15</Config>
+  <Config Name="Job Retention Days" Target="JOB_RETENTION_DAYS" Default="30" Mode="" Description="Number of days to keep completed job history." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
 
   <!-- Port -->
-  <Config Name="Web UI Port" Target="8080" Default="8095" Mode="tcp" Description="Port to access the ScriptWatch web dashboard." Type="Port" Display="always" Required="true" Mask="false">8095</Config>
+  <Config Name="Web UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port to access the ScriptWatch web dashboard." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
 </Container>

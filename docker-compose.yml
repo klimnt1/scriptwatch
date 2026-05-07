@@ -1,7 +1,10 @@
 services:
   api:
     build: .
+    container_name: scriptwatch
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       DATA_DIR: /app/data
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/scriptwatch.db}
@@ -16,7 +19,14 @@ services:
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
       BASE_URL: ${BASE_URL:-}
       MISSED_RUN_GRACE_MINUTES: ${MISSED_RUN_GRACE_MINUTES:-15}
+      JOB_RETENTION_DAYS: ${JOB_RETENTION_DAYS:-30}
     volumes:
       - ./data:/app/data
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json, urllib.request; json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
