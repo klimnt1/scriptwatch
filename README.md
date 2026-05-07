@@ -12,6 +12,8 @@ Everything lives locally:
 
 ### Docker Compose
 
+Use this path when you have the repo files on the machine running Docker. The compose file uses `build: .`, so Docker needs to see this repo's `Dockerfile`.
+
 1. Create an environment file with fresh secrets and setup values:
 
    ```bash
@@ -50,6 +52,50 @@ Everything lives locally:
 
 ScriptWatch can run as a single Unraid container. It does not need PostgreSQL, Gitea, Redis, or any other companion service.
 
+There are two good Unraid paths:
+
+- Use the Unraid Docker template at `agent/scriptwatch.xml`.
+- Use Compose Manager with an already-built image.
+
+If you use Compose Manager, do not paste the repo `docker-compose.yml` unchanged unless the whole repo is in that Compose project folder. In Compose Manager, `build: .` points at `/boot/config/plugins/compose.manager/projects/<stack-name>/`, and `./data` would also live there. For Unraid, use an image and map data to appdata instead.
+
+Example Compose Manager stack:
+
+```yaml
+services:
+  api:
+    image: scriptwatch-standalone:latest
+    container_name: scriptwatch
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /app/data
+      DATABASE_URL: sqlite:////app/data/scriptwatch.db
+      SCRIPT_STORE_DIR: /app/data/script-store
+      AGENT_TOKEN: replace-with-a-long-random-value
+      SECRET_KEY: replace-with-a-different-long-random-value
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: ""
+      ADMIN_TOKEN: ""
+      NTFY_URL: ""
+      NTFY_TOKEN: ""
+      DISCORD_WEBHOOK_URL: ""
+      BASE_URL: http://tower:8080
+      MISSED_RUN_GRACE_MINUTES: 15
+      JOB_RETENTION_DAYS: 30
+    volumes:
+      - /mnt/user/appdata/scriptwatch:/app/data
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json, urllib.request; json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+```
+
+Replace `image:` with your registry image if you pushed one, for example `your-registry.example.com/your-user/scriptwatch-standalone:latest`.
+
 1. Build or provide an image for Unraid to run.
 
    If you are testing locally on the Unraid host, build the image from this repo and use `scriptwatch-standalone:latest` as the repository name:
@@ -60,7 +106,7 @@ ScriptWatch can run as a single Unraid container. It does not need PostgreSQL, G
 
    If you publish the image to a registry, use that registry image instead in the Unraid template.
 
-2. Add the container in Unraid.
+2. Add the container in Unraid, either with the Docker template or Compose Manager.
 
    The standalone template is at:
 
@@ -83,6 +129,12 @@ You can generate secret values on any machine with Python:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+On Unraid, this also works from the terminal:
+
+```bash
+openssl rand -base64 48
 ```
 
 ### Agent Installs
