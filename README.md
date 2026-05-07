@@ -48,82 +48,64 @@ Use this path when you have the repo files on the machine running Docker. The co
 
 5. Go to Settings to set an admin password and copy the agent install command.
 
-### Unraid
+### Portainer
 
-ScriptWatch can run as a single Unraid container. It does not need PostgreSQL, Gitea, Redis, or any other companion service.
+Use this path when you already have a ScriptWatch image available and want to create the container from Portainer's **Containers > Add container** screen.
 
-There are two good Unraid paths:
-
-- Use the Unraid Docker template at `agent/scriptwatch.xml`.
-- Use Compose Manager with an already-built image.
-
-If you use Compose Manager, do not paste the repo `docker-compose.yml` unchanged unless the whole repo is in that Compose project folder. In Compose Manager, `build: .` points at `/boot/config/plugins/compose.manager/projects/<stack-name>/`, and `./data` would also live there. For Unraid, use an image and map data to appdata instead.
-
-Example Compose Manager stack:
-
-```yaml
-services:
-  api:
-    image: scriptwatch-standalone:latest
-    container_name: scriptwatch
-    restart: unless-stopped
-    environment:
-      DATA_DIR: /app/data
-      DATABASE_URL: sqlite:////app/data/scriptwatch.db
-      SCRIPT_STORE_DIR: /app/data/script-store
-      AGENT_TOKEN: replace-with-a-long-random-value
-      SECRET_KEY: replace-with-a-different-long-random-value
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: ""
-      ADMIN_TOKEN: ""
-      NTFY_URL: ""
-      NTFY_TOKEN: ""
-      DISCORD_WEBHOOK_URL: ""
-      BASE_URL: http://tower:8080
-      MISSED_RUN_GRACE_MINUTES: 15
-      JOB_RETENTION_DAYS: 30
-    volumes:
-      - /mnt/user/appdata/scriptwatch:/app/data
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import json, urllib.request; json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-```
-
-Replace `image:` with your registry image if you pushed one, for example `your-registry.example.com/your-user/scriptwatch-standalone:latest`.
-
-1. Build or provide an image for Unraid to run.
-
-   If you are testing locally on the Unraid host, build the image from this repo and use `scriptwatch-standalone:latest` as the repository name:
-
-   ```bash
-   docker build -t scriptwatch-standalone:latest .
-   ```
-
-   If you publish the image to a registry, use that registry image instead in the Unraid template.
-
-2. Add the container in Unraid, either with the Docker template or Compose Manager.
-
-   The standalone template is at:
+1. Fill in the top section:
 
    ```text
-   agent/scriptwatch.xml
+   Name: scriptwatch
+   Image: your-registry.example.com/your-user/scriptwatch-standalone:latest
    ```
 
-   Important settings:
+   If the image is only local on the Docker host, use the local image name, for example `scriptwatch-standalone:latest`, and turn off **Always pull the image**.
 
-   - Map `/app/data` to persistent storage, for example `/mnt/user/appdata/scriptwatch`.
-   - Set `BASE_URL` to the URL agents can reach, for example `http://tower:8080` or `http://192.168.1.50:8080`.
-   - Generate unique values for `AGENT_TOKEN` and `SECRET_KEY`.
-   - Leave `DATABASE_URL` as `sqlite:////app/data/scriptwatch.db` unless you intentionally move the SQLite file.
+2. Under **Network ports configuration**, add one port mapping:
 
-3. Start the container and open the Web UI from Unraid.
+   ```text
+   Host port: 8080
+   Container port: 8080
+   Protocol: TCP
+   ```
 
-4. Go to Settings to set an admin password and copy the agent install command.
+3. Under **Advanced container settings > Volumes**, add a bind mount:
+
+   ```text
+   Container: /app/data
+   Host: /opt/scriptwatch/data
+   ```
+
+   You can use another host path if you prefer. This folder is the important backup target because it contains the SQLite database and local script snapshots.
+
+4. Under **Advanced container settings > Env**, add these variables:
+
+   ```env
+   DATA_DIR=/app/data
+   DATABASE_URL=sqlite:////app/data/scriptwatch.db
+   SCRIPT_STORE_DIR=/app/data/script-store
+   AGENT_TOKEN=replace-with-a-long-random-value
+   SECRET_KEY=replace-with-a-different-long-random-value
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=
+   ADMIN_TOKEN=
+   BASE_URL=http://your-server-ip:8080
+   NTFY_URL=
+   NTFY_TOKEN=
+   DISCORD_WEBHOOK_URL=
+   MISSED_RUN_GRACE_MINUTES=15
+   JOB_RETENTION_DAYS=30
+   ```
+
+5. Under **Advanced container settings > Restart policy**, choose **Unless stopped**.
+
+6. Deploy the container and open:
+
+   ```text
+   http://your-server-ip:8080
+   ```
+
+7. Go to Settings to set an admin password and copy the agent install command.
 
 You can generate secret values on any machine with Python:
 
@@ -131,7 +113,7 @@ You can generate secret values on any machine with Python:
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-On Unraid, this also works from the terminal:
+If Python is not available, OpenSSL also works:
 
 ```bash
 openssl rand -base64 48
@@ -154,7 +136,7 @@ Do not share your `.env` file. Each install should generate its own `AGENT_TOKEN
 Back up the persistent data directory, not the container:
 
 - Docker Compose: `./data`
-- Unraid: the host path mapped to `/app/data`, commonly `/mnt/user/appdata/scriptwatch`
+- Portainer: the host path mapped to `/app/data`, for example `/opt/scriptwatch/data`
 
 ## Notes
 
