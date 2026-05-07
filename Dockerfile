@@ -1,5 +1,19 @@
 FROM python:3.11-slim
 WORKDIR /app
+ENV DATA_DIR=/app/data \
+    DATABASE_URL=sqlite:////app/data/scriptwatch.db \
+    SCRIPT_STORE_DIR=/app/data/script-store \
+    AGENT_TOKEN=changeme \
+    SECRET_KEY=dev-secret-change-me \
+    ADMIN_USERNAME=admin \
+    ADMIN_PASSWORD= \
+    ADMIN_TOKEN= \
+    BASE_URL= \
+    NTFY_URL= \
+    NTFY_TOKEN= \
+    DISCORD_WEBHOOK_URL= \
+    MISSED_RUN_GRACE_MINUTES=15 \
+    JOB_RETENTION_DAYS=30
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .

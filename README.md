@@ -78,7 +78,9 @@ Use this path when you already have a ScriptWatch image available and want to cr
 
    You can use another host path if you prefer. This folder is the important backup target because it contains the SQLite database and local script snapshots.
 
-4. Under **Advanced container settings > Env**, add these variables:
+4. Under **Advanced container settings > Env**, review these variables.
+
+   Newer images include these environment variables as editable defaults in Portainer. If any are missing, add them manually:
 
    ```env
    DATA_DIR=/app/data
@@ -96,6 +98,8 @@ Use this path when you already have a ScriptWatch image available and want to cr
    MISSED_RUN_GRACE_MINUTES=15
    JOB_RETENTION_DAYS=30
    ```
+
+   Replace `AGENT_TOKEN`, `SECRET_KEY`, and `BASE_URL` before deploying. Leave the `/app/data` paths as-is unless you also change the volume mapping.
 
 5. Under **Advanced container settings > Restart policy**, choose **Unless stopped**.
 
