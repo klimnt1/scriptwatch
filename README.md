@@ -69,6 +69,8 @@ Use this path when you already have a ScriptWatch image available and want to cr
    Protocol: TCP
    ```
 
+   The image exposes port `8080`, but Portainer does not always publish exposed ports automatically. Add this mapping explicitly so the Web UI is reachable from your browser.
+
 3. Under **Advanced container settings > Volumes**, add a bind mount:
 
    ```text
