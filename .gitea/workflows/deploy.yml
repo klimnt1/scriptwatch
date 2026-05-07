@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'api/**'
+      - 'agent/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - 'wsgi.py'
+      - 'gunicorn.conf.py'
 
 jobs:
   build:
@@ -14,10 +21,15 @@ jobs:
       - name: Login to Gitea registry
         run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login gitea.plexusprime.net -u adrianoropesa --password-stdin
 
-      - name: Build and push
+      - name: Build and push API
         run: |
           docker build -t gitea.plexusprime.net/adrianoropesa/${{ github.event.repository.name }}:latest .
           docker push gitea.plexusprime.net/adrianoropesa/${{ github.event.repository.name }}:latest
+
+      - name: Build and push Agent
+        run: |
+          docker build -t gitea.plexusprime.net/adrianoropesa/${{ github.event.repository.name }}-agent:latest ./agent
+          docker push gitea.plexusprime.net/adrianoropesa/${{ github.event.repository.name }}-agent:latest
 
       - name: Cleanup
         if: always()

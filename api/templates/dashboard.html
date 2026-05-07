@@ -1,0 +1,1196 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ScriptWatch{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4 sw-stat-grid">
+  <div class="col-6 col-lg-3">
+    <a href="/?status=active" class="text-decoration-none">
+    <div class="card sw-stat-card sw-stat-card-link">
+      <div class="card-body">
+        <div class="sw-stat-icon text-warning"><i class="bi bi-lightning-charge"></i></div>
+        <div>
+          <div class="sw-stat-value {% if stats.running_now > 0 %}text-warning{% endif %}" id="stat-running-now">{{ stats.running_now }}</div>
+          <div class="sw-stat-label">Running now</div>
+        </div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card sw-stat-card">
+      <div class="card-body">
+        <div class="sw-stat-icon text-info"><i class="bi bi-clock-history"></i></div>
+        <div>
+          <div class="sw-stat-value" id="stat-runs-today">{{ stats.today_total }}</div>
+          <div class="sw-stat-label">Runs today</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card sw-stat-card">
+      <div class="card-body">
+        <div class="sw-stat-icon text-success"><i class="bi bi-check2-circle"></i></div>
+        <div>
+          <div class="sw-stat-value text-success" id="stat-successes-today">{{ stats.today_successes }}</div>
+          <div class="sw-stat-label">Success today</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card sw-stat-card {% if stats.today_failures > 0 %}border-danger{% endif %}" id="failure-card">
+      <div class="card-body">
+        <div class="sw-stat-icon text-danger"><i class="bi bi-exclamation-octagon"></i></div>
+        <div>
+          <div class="sw-stat-value {% if stats.today_failures > 0 %}text-danger{% endif %}" id="failure-count">{{ stats.today_failures }}</div>
+          <div class="sw-stat-label">Failures today</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="active-failures-section" class="mb-4" {% if not active_failures %}style="display:none"{% endif %}>
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <h5 class="mb-0 text-danger"><i class="bi bi-exclamation-octagon-fill me-1"></i>Active Failures</h5>
+    <span class="badge bg-danger" id="active-failure-count">{{ active_failures|length }}</span>
+  </div>
+  <div class="card border-danger">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 sw-mobile-stack-table">
+        <thead>
+          <tr>
+            <th>Script</th>
+            <th>Server</th>
+            <th>Status</th>
+            <th class="d-none d-md-table-cell">Triggered</th>
+            <th>Finished</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="active-failures-tbody">
+          {% for job in active_failures %}
+          <tr>
+            <td data-label="Script">{{ job.script.name if job.script else ("Uninstall Agent" if job.triggered_by == "uninstall" else "Update Agent") }}</td>
+            <td data-label="Server"><span class="badge bg-secondary">{{ job.server.name if job.server else "—" }}</span></td>
+            <td data-label="Status">
+              {% if job.status == "timeout" %}
+                <span class="badge bg-warning text-dark">Timeout</span>
+              {% else %}
+                <span class="badge bg-danger">Failed</span>
+              {% endif %}
+            </td>
+            <td class="d-none d-md-table-cell" data-label="Triggered">{{ job.triggered_by }}</td>
+            <td class="text-muted small" data-label="Finished">
+              {% if job.completed_at %}
+                <span class="relative-time" data-ts="{{ job.completed_at }}">{{ job.completed_at }}</span>
+              {% else %}
+                <span class="relative-time" data-ts="{{ job.created_at }}">{{ job.created_at }}</span>
+              {% endif %}
+            </td>
+            <td data-label="Actions">
+              <div class="d-flex gap-1">
+                <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline-secondary">Logs</a>
+                {% if job.script and job.server %}
+                <button class="btn btn-sm btn-outline-warning replay-failure-btn" data-job-id="{{ job.id }}">Replay</button>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-danger dismiss-failure-btn" data-job-id="{{ job.id }}">Dismiss</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="active-anomalies-section" class="mb-4" {% if not active_anomalies %}style="display:none"{% endif %}>
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <h5 class="mb-0 text-warning"><i class="bi bi-activity me-1"></i>Runtime Anomalies</h5>
+    <span class="badge bg-warning text-dark" id="active-anomaly-count">{{ active_anomalies|length }}</span>
+  </div>
+  <div class="card border-warning">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 sw-mobile-stack-table">
+        <thead>
+          <tr>
+            <th>Script</th>
+            <th>Server</th>
+            <th>Duration</th>
+            <th>Reason</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="active-anomalies-tbody">
+          {% for job in active_anomalies %}
+          <tr>
+            <td data-label="Script">{{ job.script.name if job.script else "—" }}</td>
+            <td data-label="Server"><span class="badge bg-secondary">{{ job.server.name if job.server else "—" }}</span></td>
+            <td data-label="Duration">{{ job.duration_seconds or "—" }}s</td>
+            <td class="text-muted small" data-label="Reason">{{ job.anomaly_reason }}</td>
+            <td data-label="Actions">
+              <div class="d-flex gap-1">
+                <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline-secondary">Logs</a>
+                <button class="btn btn-sm btn-outline-warning dismiss-anomaly-btn" data-job-id="{{ job.id }}">Dismiss</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if missed_runs %}
+<div class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert" id="missed-runs-alert">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+  <div class="flex-grow-1">
+    <strong>Missed scheduled runs (last 24h)</strong>
+    <ul class="mb-0 mt-1">
+      {% for mr in missed_runs %}
+      <li>
+        <strong>{{ mr.script.name }}</strong> on <strong>{{ mr.server.name }}</strong>
+        — expected at {{ mr.expected_at | to_et }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <button type="button" class="btn-close flex-shrink-0" id="dismiss-missed-runs" title="Dismiss"></button>
+</div>
+{% endif %}
+
+<!-- Manage Tags modal -->
+<div class="modal fade" id="manageTagsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tags me-2"></i>Manage Tags</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="manage-tags-body">
+        <div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Picker modal -->
+<div class="modal fade" id="tagPickerModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tag me-2"></i>Assign Tags</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="tag-picker-body">
+        <div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="tag-picker-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sw-dashboard-layout mb-4">
+  <section>
+    <div class="sw-section-header">
+      <div>
+        <h4 class="mb-0">Servers</h4>
+        <div class="text-muted small">Agent health, version state, and target tags</div>
+      </div>
+      <div class="col-auto">
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+          <button class="btn btn-outline-warning btn-sm" id="update-outdated-agents">
+            <i class="bi bi-arrow-repeat me-1"></i>Update Outdated
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="openManageTags()">
+            <i class="bi bi-tags me-1"></i>Manage Tags
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="sw-fill-grid sw-server-grid">
+      {% for server in servers %}
+      <div class="server-card-wrap" data-server-tags="{{ (server.tags or []) | join(' ') }}">
+        <div class="card h-100 sw-server-card {% if server.is_online %}sw-server-online{% else %}sw-server-offline{% endif %}" data-server-name="{{ server.name }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="min-w-0">
+                <h6 class="card-title mb-0 fw-semibold text-truncate">{{ server.name }}</h6>
+                <div class="text-muted small text-truncate">{{ server.hostname or "No hostname" }}</div>
+              </div>
+              <div class="d-flex gap-2 align-items-center flex-shrink-0">
+                <span class="server-status-badge {% if server.is_online %}badge bg-success{% else %}badge bg-danger{% endif %}">{{ "Online" if server.is_online else "Offline" }}</span>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1 remove-server" data-name="{{ server.name }}" data-online="{{ server.is_online | lower }}" title="Remove server">×</button>
+              </div>
+            </div>
+            <div class="sw-server-meta">
+              <span><i class="bi bi-broadcast-pin me-1"></i>
+              {% if server.last_heartbeat %}
+                Last seen: <span class="relative-time" data-ts="{{ server.last_heartbeat }}">{{ server.last_heartbeat }}</span>
+              {% else %}
+                Never connected
+              {% endif %}
+              </span>
+            </div>
+            <div class="mb-2 sw-agent-state" id="agent-badge-{{ server.name }}">
+              {% if not latest_agent_hash or not server.agent_hash %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Agent unknown</span>
+              {% elif server.agent_hash == latest_agent_hash %}
+                <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Up to date</span>
+              {% else %}
+                <button class="btn btn-sm btn-warning py-0 px-2 update-agent-btn"
+                        data-server-name="{{ server.name }}">Agent update</button>
+              {% endif %}
+            </div>
+            <div class="mt-2 d-flex flex-wrap gap-1 align-items-center sw-server-tags" id="tags-{{ server.id }}">
+              {% for tag in (server.tags or []) %}
+              <span class="badge bg-secondary tag-badge sw-tag-badge" data-tag="{{ tag }}">{{ tag }}
+                <button type="button" class="btn-close btn-close-white ms-1 tag-remove-btn" style="font-size:0.5em" data-server-id="{{ server.id }}" data-tag="{{ tag }}"></button>
+              </span>
+              {% endfor %}
+              <button class="btn btn-outline-secondary btn-sm py-0 px-1 add-tag-btn"
+                      data-server-id="{{ server.id }}"
+                      data-server-name="{{ server.name }}"
+                      data-current-tags="{{ (server.tags or []) | tojson | e }}"
+                      title="Assign tags" style="font-size:0.75rem"><i class="bi bi-plus"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="sw-grid-empty">
+        <p class="text-muted">No servers registered yet. Deploy an agent to get started.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="sw-tag-sidebar">
+    <div class="sw-section-header">
+      <div>
+        <h4 class="mb-0">Tag Groups</h4>
+        <div class="text-muted small">Quick filters</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small" id="tag-filter-state">All servers</span>
+        <button class="btn btn-outline-secondary btn-sm py-0 px-2 d-none" id="clear-tag-filter" type="button">Clear</button>
+      </div>
+    </div>
+    <div class="sw-tag-groups-list" id="tag-groups-row">
+      <div class="text-muted small">Loading tag groups…</div>
+    </div>
+  </aside>
+</div>
+
+<div class="sw-section-header">
+  <div>
+    <h4 class="mb-0">Recent Jobs</h4>
+    <div class="text-muted small">Latest executions and filtered history</div>
+  </div>
+  <div class="text-muted small">{{ pagination.total }} total</div>
+</div>
+
+<form class="card mb-3 sw-filter-card" method="get" id="job-filter-form">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Status</label>
+        <select class="form-select form-select-sm" name="status">
+          <option value="">Any</option>
+          {% for status in ["active", "pending", "running", "cancelling", "success", "failure", "timeout", "cancelled"] %}
+          <option value="{{ status }}" {% if job_filters.status == status %}selected{% endif %}>{{ status|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Server</label>
+        <select class="form-select form-select-sm" name="server_id">
+          <option value="">Any</option>
+          {% for server in servers %}
+          <option value="{{ server.id }}" {% if job_filters.server_id == server.id %}selected{% endif %}>{{ server.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Script</label>
+        <select class="form-select form-select-sm" name="script_id">
+          <option value="">Any</option>
+          {% for script in scripts %}
+          <option value="{{ script.id }}" {% if job_filters.script_id == script.id %}selected{% endif %}>{{ script.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Triggered</label>
+        <select class="form-select form-select-sm" name="triggered_by">
+          <option value="">Any</option>
+          {% for source in ["manual", "schedule", "system"] %}
+          <option value="{{ source }}" {% if job_filters.triggered_by == source %}selected{% endif %}>{{ source|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Dismissed</label>
+        <select class="form-select form-select-sm" name="dismissed">
+          <option value="">Any</option>
+          <option value="false" {% if job_filters.dismissed == "false" %}selected{% endif %}>Active</option>
+          <option value="true" {% if job_filters.dismissed == "true" %}selected{% endif %}>Dismissed</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1 d-grid">
+        <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 sw-mobile-stack-table">
+      <thead>
+        <tr>
+          <th>Script</th>
+          <th>Server</th>
+          <th>Status</th>
+          <th class="d-none d-md-table-cell">Triggered</th>
+          <th>Started</th>
+          <th class="d-none d-md-table-cell">Duration</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="jobs-tbody">
+        {% for job in recent_jobs %}
+        <tr>
+          <td data-label="Script">{{ job.script.name if job.script else ("Uninstall Agent" if job.triggered_by == "uninstall" else "Update Agent") }}</td>
+          <td data-label="Server"><span class="badge bg-secondary">{{ job.server.name if job.server else "—" }}</span></td>
+          <td data-label="Status">
+            {% if job.status == "success" %}
+              <span class="badge bg-success">Success</span>
+            {% elif job.status == "failure" %}
+              <span class="badge bg-danger">Failed</span>
+            {% elif job.status == "running" %}
+              <span class="badge bg-warning text-dark">Running</span>
+            {% elif job.status == "timeout" %}
+              <span class="badge bg-warning text-dark">Timeout</span>
+            {% else %}
+              <span class="badge bg-secondary">Pending</span>
+            {% endif %}
+          </td>
+          <td class="d-none d-md-table-cell" data-label="Triggered">{{ job.triggered_by }}</td>
+          <td class="text-muted small" data-label="Started">
+            {% if job.started_at %}
+              <span class="relative-time" data-ts="{{ job.started_at }}">{{ job.started_at }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted small d-none d-md-table-cell" data-label="Duration">
+            {% if job.started_at and job.completed_at %}
+              {{ ((job.completed_at - job.started_at).seconds) }}s
+            {% elif job.status == "running" %}
+              <span class="spinner-border spinner-border-sm text-warning"></span>
+            {% else %}—{% endif %}
+          </td>
+          <td data-label="Actions">
+            <a href="/jobs/{{ job.id }}" class="btn btn-sm btn-outline-secondary">Logs</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No jobs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="/?{{ request.query_string.decode() | replace('page=' ~ pagination.page, 'page=' ~ pagination.prev_num) if 'page=' in request.query_string.decode() else request.query_string.decode() ~ ('&' if request.query_string else '') ~ 'page=' ~ pagination.prev_num }}">Previous</a>
+    </li>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+          <a class="page-link" href="/?{{ request.query_string.decode() | replace('page=' ~ pagination.page, 'page=' ~ p) if 'page=' in request.query_string.decode() else request.query_string.decode() ~ ('&' if request.query_string else '') ~ 'page=' ~ p }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="/?{{ request.query_string.decode() | replace('page=' ~ pagination.page, 'page=' ~ pagination.next_num) if 'page=' in request.query_string.decode() else request.query_string.decode() ~ ('&' if request.query_string else '') ~ 'page=' ~ pagination.next_num }}">Next</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% block scripts %}
+<script>
+function relTime(ts) {
+  if (!ts) return '—';
+  const diff = Math.floor((Date.now() - new Date(ts + (ts.endsWith('Z') ? '' : 'Z'))) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function statusBadge(status) {
+  const map = {
+    success: 'bg-success',
+    failure: 'bg-danger',
+    running: 'bg-warning text-dark',
+    timeout: 'bg-warning text-dark',
+    cancelling: 'bg-secondary',
+    cancelled: 'bg-secondary',
+  };
+  const cls = map[status] || 'bg-secondary';
+  const spin = status === 'running' ? '<span class="spinner-border spinner-border-sm me-1"></span>' : '';
+  const label = status === 'cancelling' ? 'Cancelling…' : status.charAt(0).toUpperCase() + status.slice(1);
+  return `<span class="badge ${cls}">${spin}${label}</span>`;
+}
+
+function renderActiveFailures(jobs) {
+  const section = document.getElementById('active-failures-section');
+  const tbody = document.getElementById('active-failures-tbody');
+  const count = document.getElementById('active-failure-count');
+  const failureCount = document.getElementById('failure-count');
+  const failureCard = document.getElementById('failure-card');
+  if (count) count.textContent = jobs.length;
+  if (failureCount) {
+    failureCount.textContent = jobs.length;
+    failureCount.classList.toggle('text-danger', jobs.length > 0);
+  }
+  if (failureCard) failureCard.classList.toggle('border-danger', jobs.length > 0);
+  if (!jobs.length) {
+    section.style.display = 'none';
+    tbody.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  tbody.innerHTML = jobs.map(j => `
+    <tr>
+      <td data-label="Script">${escHtml(j.script_name || '—')}</td>
+      <td data-label="Server"><span class="badge bg-secondary">${escHtml(j.server_name || '—')}</span></td>
+      <td data-label="Status">${statusBadge(j.status)}</td>
+      <td class="d-none d-md-table-cell" data-label="Triggered">${escHtml(j.triggered_by || '—')}</td>
+      <td class="text-muted small" data-label="Finished">${relTime(j.completed_at || j.created_at)}</td>
+      <td data-label="Actions">
+        <div class="d-flex gap-1">
+          <a href="/jobs/${j.id}" class="btn btn-sm btn-outline-secondary">Logs</a>
+          ${j.script_id && j.server_id ? `<button class="btn btn-sm btn-outline-warning replay-failure-btn" data-job-id="${j.id}">Replay</button>` : ''}
+          <button class="btn btn-sm btn-outline-danger dismiss-failure-btn" data-job-id="${j.id}">Dismiss</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function pollActiveFailures() {
+  fetch('/api/jobs/failures')
+    .then(r => r.json())
+    .then(jobs => {
+      renderActiveFailures(jobs);
+      setTimeout(pollActiveFailures, 30000);
+    })
+    .catch(() => setTimeout(pollActiveFailures, 30000));
+}
+
+function renderActiveAnomalies(jobs) {
+  const section = document.getElementById('active-anomalies-section');
+  const tbody = document.getElementById('active-anomalies-tbody');
+  const count = document.getElementById('active-anomaly-count');
+  if (!section || !tbody) return;
+  if (count) count.textContent = jobs.length;
+  if (!jobs.length) {
+    section.style.display = 'none';
+    tbody.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  tbody.innerHTML = jobs.map(j => `
+    <tr>
+      <td data-label="Script">${escHtml(j.script_name || '—')}</td>
+      <td data-label="Server"><span class="badge bg-secondary">${escHtml(j.server_name || '—')}</span></td>
+      <td data-label="Duration">${j.duration_seconds || '—'}s</td>
+      <td class="text-muted small" data-label="Reason">${escHtml(j.anomaly_reason || 'Runtime anomaly detected.')}</td>
+      <td data-label="Actions">
+        <div class="d-flex gap-1">
+          <a href="/jobs/${j.id}" class="btn btn-sm btn-outline-secondary">Logs</a>
+          <button class="btn btn-sm btn-outline-warning dismiss-anomaly-btn" data-job-id="${j.id}">Dismiss</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function pollActiveAnomalies() {
+  fetch('/api/jobs/anomalies')
+    .then(r => r.json())
+    .then(jobs => {
+      renderActiveAnomalies(jobs);
+      setTimeout(pollActiveAnomalies, 30000);
+    })
+    .catch(() => setTimeout(pollActiveAnomalies, 30000));
+}
+
+async function stopJob(jobId) {
+  const resp = await fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    swToast(data.error || 'Failed to cancel job', 'danger');
+  }
+}
+
+async function dismissAnomaly(jobId, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Dismissing…';
+  }
+  const resp = await fetch(`/api/jobs/${jobId}/dismiss`, { method: 'POST' });
+  if (resp.ok) {
+    const anomalies = await fetch('/api/jobs/anomalies').then(r => r.json());
+    renderActiveAnomalies(anomalies);
+    swToast('Anomaly dismissed.');
+  } else {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Dismiss';
+    }
+    swToast('Failed to dismiss anomaly', 'danger');
+  }
+}
+
+async function dismissFailure(jobId, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Dismissing…';
+  }
+  const resp = await fetch(`/api/jobs/${jobId}/dismiss`, { method: 'POST' });
+  if (resp.ok) {
+    const failures = await fetch('/api/jobs/failures').then(r => r.json());
+    renderActiveFailures(failures);
+    swToast('Failure dismissed.');
+  } else {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Dismiss';
+    }
+    swToast('Failed to dismiss failure', 'danger');
+  }
+}
+
+async function replayFailure(jobId, btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Replaying…';
+  }
+  const resp = await fetch(`/api/jobs/${jobId}/replay`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mode: 'current'}),
+  });
+  if (resp.ok) {
+    const job = await resp.json();
+    window.location.href = `/jobs/${job.id}`;
+  } else {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Replay';
+    }
+    swToast('Failed to replay job', 'danger');
+  }
+}
+
+function renderJobs(jobs) {
+  const tbody = document.getElementById('jobs-tbody');
+  if (!jobs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No jobs yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = jobs.map(j => `
+    <tr>
+      <td data-label="Script">${escHtml(j.script_name || '—')}</td>
+      <td data-label="Server"><span class="badge bg-secondary">${escHtml(j.server_name || '—')}</span></td>
+      <td data-label="Status">${statusBadge(j.status)}</td>
+      <td class="d-none d-md-table-cell" data-label="Triggered">${escHtml(j.triggered_by || '—')}</td>
+      <td class="text-muted small" data-label="Started">${relTime(j.started_at)}</td>
+      <td class="text-muted small d-none d-md-table-cell" data-label="Duration">${j.started_at && j.completed_at ? Math.round((new Date(j.completed_at+'Z') - new Date(j.started_at+'Z'))/1000)+'s' : j.status === 'running' ? '<span class="spinner-border spinner-border-sm text-warning"></span>' : '—'}</td>
+      <td data-label="Actions">
+        <div class="d-flex gap-1">
+          <a href="/jobs/${j.id}" class="btn btn-sm btn-outline-secondary">Logs</a>
+          ${j.status === 'running' || j.status === 'pending' ? `<button class="btn btn-sm btn-danger stop-job-btn" data-job-id="${j.id}">Stop</button>` : ''}
+          ${j.status === 'cancelling' ? `<button class="btn btn-sm btn-outline-danger stop-job-btn" data-job-id="${j.id}" title="Force stop">Force Stop</button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function pollRunningJobs() {
+  fetch('/api/jobs/running')
+    .then(r => r.json())
+    .then(jobs => {
+      const el = document.getElementById('stat-running-now');
+      if (el) {
+        el.textContent = jobs.length;
+        el.className = 'sw-stat-value' + (jobs.length > 0 ? ' text-warning' : '');
+      }
+      setTimeout(pollRunningJobs, jobs.length > 0 ? 3000 : 5000);
+    })
+    .catch(() => setTimeout(pollRunningJobs, 5000));
+}
+
+function pollStats() {
+  fetch('/api/jobs/stats')
+    .then(r => r.json())
+    .then(s => {
+      const runningEl = document.getElementById('stat-running-now');
+      if (runningEl) {
+        runningEl.textContent = s.running_now;
+        runningEl.className = 'sw-stat-value' + (s.running_now > 0 ? ' text-warning' : '');
+      }
+      const todayEl = document.getElementById('stat-runs-today');
+      if (todayEl) todayEl.textContent = s.today_total;
+      const successEl = document.getElementById('stat-successes-today');
+      if (successEl) successEl.textContent = s.today_successes;
+      const failEl = document.getElementById('failure-count');
+      if (failEl) {
+        failEl.textContent = s.today_failures;
+        failEl.className = 'sw-stat-value' + (s.today_failures > 0 ? ' text-danger' : '');
+        const card = document.getElementById('failure-card');
+        if (card) card.classList.toggle('border-danger', s.today_failures > 0);
+      }
+      setTimeout(pollStats, 30000);
+    })
+    .catch(() => setTimeout(pollStats, 30000));
+}
+
+function pollServers() {
+  fetch('/api/servers/')
+    .then(r => r.json())
+    .then(servers => {
+      const visibleNames = new Set(servers.map(s => s.name));
+      document.querySelectorAll('.sw-server-card[data-server-name]').forEach(card => {
+        if (!visibleNames.has(card.dataset.serverName)) {
+          card.closest('.server-card-wrap')?.remove();
+        }
+      });
+      servers.forEach(s => {
+        const card = document.querySelector(`.sw-server-card[data-server-name="${CSS.escape(s.name)}"]`);
+        if (!card) return;
+        const badge = card.querySelector('.server-status-badge');
+        const removeBtn = card.querySelector('.remove-server');
+        if (badge) {
+          badge.textContent = s.is_online ? 'Online' : 'Offline';
+          badge.className = 'server-status-badge badge ' + (s.is_online ? 'bg-success' : 'bg-danger');
+        }
+        card.classList.toggle('sw-server-online', s.is_online);
+        card.classList.toggle('sw-server-offline', !s.is_online);
+        if (removeBtn) removeBtn.dataset.online = s.is_online ? 'true' : 'false';
+      });
+      setTimeout(pollServers, 30000);
+    })
+    .catch(() => setTimeout(pollServers, 30000));
+}
+
+setTimeout(pollRunningJobs, 300);
+setTimeout(pollActiveFailures, 1000);
+setTimeout(pollActiveAnomalies, 1000);
+setTimeout(pollStats, 1000);
+setTimeout(pollServers, 1000);
+
+function pollJobs() {
+  const page = new URLSearchParams(window.location.search).get('page') || 1;
+  const params = new URLSearchParams(window.location.search);
+  params.set('page', page);
+  params.set('per_page', '10');
+  fetch(`/api/jobs/?${params.toString()}`)
+    .then(r => r.json())
+    .then(data => {
+      renderJobs(data.jobs);
+      const hasActive = data.jobs.some(j => j.status === 'running' || j.status === 'pending' || j.status === 'cancelling');
+      setTimeout(pollJobs, hasActive ? 4000 : 30000);
+    })
+    .catch(() => setTimeout(pollJobs, 30000));
+}
+
+setTimeout(pollJobs, 500);
+
+document.getElementById('job-filter-form')?.addEventListener('change', e => {
+  if (e.target.matches('select')) e.currentTarget.submit();
+});
+
+document.getElementById('update-outdated-agents')?.addEventListener('click', async e => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass me-1"></i>Queueing…';
+  let latestHash = null;
+  try {
+    const hashResp = await fetch('/api/agent/latest-hash');
+    if (hashResp.ok) latestHash = (await hashResp.json()).hash;
+  } catch (_) {}
+  const resp = await fetch('/api/servers/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({only_outdated: true, latest_hash: latestHash}),
+  });
+  if (resp.ok) {
+    const jobs = await resp.json();
+    swToast(`Queued ${jobs.length} agent update${jobs.length === 1 ? '' : 's'}.`);
+    refreshAgentBadges();
+  } else {
+    swToast('Failed to queue agent updates', 'danger');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Update Outdated';
+});
+
+// ── Tag badge DOM helpers ────────────────────────────────────────────────────
+
+function renderTagBadges(serverId, tags, serverName, btn) {
+  const container = document.getElementById(`tags-${serverId}`);
+  container.querySelectorAll('.tag-badge').forEach(b => b.remove());
+  tags.forEach(tag => {
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-secondary tag-badge sw-tag-badge';
+    badge.dataset.tag = tag;
+    badge.innerHTML = `${renderTagLabel(tag)} <button type="button" class="btn-close btn-close-white ms-1 tag-remove-btn" style="font-size:0.5em" data-server-id="${serverId}" data-tag="${escHtml(tag)}"></button>`;
+    container.insertBefore(badge, btn);
+  });
+  btn.dataset.currentTags = JSON.stringify(tags);
+  loadTagGroups();
+}
+
+function domApplyTagDelete(tagName) {
+  document.querySelectorAll(`.tag-badge[data-tag="${CSS.escape(tagName)}"]`).forEach(el => el.remove());
+  document.querySelectorAll('.add-tag-btn').forEach(btn => {
+    btn.dataset.currentTags = JSON.stringify(
+      JSON.parse(btn.dataset.currentTags || '[]').filter(t => t !== tagName)
+    );
+  });
+}
+
+function domApplyTagRename(oldName, newName) {
+  document.querySelectorAll('.tag-badge').forEach(badge => {
+    if (badge.dataset.tag !== oldName) return;
+    badge.dataset.tag = newName;
+    const serverId = badge.querySelector('.tag-remove-btn').dataset.serverId;
+    badge.innerHTML = `${renderTagLabel(newName)} <button type="button" class="btn-close btn-close-white ms-1 tag-remove-btn" style="font-size:0.5em" data-server-id="${serverId}" data-tag="${escHtml(newName)}"></button>`;
+  });
+  document.querySelectorAll('.add-tag-btn').forEach(btn => {
+    btn.dataset.currentTags = JSON.stringify(
+      JSON.parse(btn.dataset.currentTags || '[]').map(t => t === oldName ? newName : t)
+    );
+  });
+}
+
+function parseTag(tag) {
+  const idx = String(tag || '').indexOf(':');
+  if (idx <= 0 || idx === tag.length - 1) return {category: 'other', value: tag, categorized: false};
+  return {category: tag.slice(0, idx), value: tag.slice(idx + 1), categorized: true};
+}
+
+function renderTagLabel(tag) {
+  const parsed = parseTag(tag);
+  if (!parsed.categorized) return escHtml(tag);
+  return `<span class="sw-tag-category">${escHtml(parsed.category)}</span><span class="sw-tag-separator">:</span><span>${escHtml(parsed.value)}</span>`;
+}
+
+async function loadTagGroups() {
+  const row = document.getElementById('tag-groups-row');
+  if (!row) return;
+  const resp = await fetch('/api/tags/summary');
+  if (!resp.ok) {
+    row.innerHTML = '<div class="text-danger small">Failed to load tag groups.</div>';
+    return;
+  }
+  const groups = (await resp.json()).filter(group => group.tags.length);
+  if (!groups.length) {
+    row.innerHTML = '<div class="text-muted small">No tags yet.</div>';
+    return;
+  }
+  row.innerHTML = groups.map(group => `
+    <div class="sw-tag-group-row">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div>
+          <h6 class="mb-0 text-capitalize">${escHtml(group.category)}</h6>
+          <div class="sw-tag-health">
+            <span><i class="bi bi-check-circle me-1 text-success"></i>${group.online} online</span>
+            <span><i class="bi bi-dash-circle me-1 ${group.offline ? 'text-danger' : 'text-muted'}"></i>${group.offline} offline</span>
+          </div>
+        </div>
+        <span class="sw-tag-group-total">${group.total_servers}</span>
+      </div>
+      <div class="d-flex flex-wrap gap-1 mt-2">
+        ${group.tags.map(tag => `
+          <button class="btn btn-sm btn-outline-secondary tag-filter-btn"
+                  type="button"
+                  data-tag="${escHtml(tag.name)}"
+                  title="${escHtml((tag.servers || []).join(', ') || 'No servers')}">
+            ${renderTagLabel(tag.name)}
+            <span class="ms-1 text-muted">${tag.total_servers}</span>
+          </button>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+loadTagGroups();
+
+function applyServerTagFilter(tag) {
+  let visible = 0;
+  document.querySelectorAll('.server-card-wrap').forEach(card => {
+    const tags = (card.dataset.serverTags || '').split(/\s+/).filter(Boolean);
+    const show = tags.includes(tag);
+    card.style.display = show ? '' : 'none';
+    if (show) visible += 1;
+  });
+  document.getElementById('tag-filter-state').textContent = `${visible} match${visible === 1 ? '' : 'es'}`;
+  document.getElementById('clear-tag-filter').classList.remove('d-none');
+}
+
+document.addEventListener('click', e => {
+  const tagBtn = e.target.closest('.tag-filter-btn');
+  if (!tagBtn) return;
+  applyServerTagFilter(tagBtn.dataset.tag);
+});
+
+document.getElementById('clear-tag-filter')?.addEventListener('click', e => {
+  document.querySelectorAll('.server-card-wrap').forEach(card => card.style.display = '');
+  document.getElementById('tag-filter-state').textContent = 'All servers';
+  e.currentTarget.classList.add('d-none');
+});
+
+// ── Server tag removal (event delegation) ───────────────────────────────────
+
+document.addEventListener('click', async function(e) {
+  // Update agent button
+  const updateBtn = e.target.closest('.update-agent-btn');
+  if (updateBtn) {
+    e.stopPropagation();
+    const name = updateBtn.dataset.serverName;
+    updateBtn.disabled = true;
+    updateBtn.textContent = 'Queuing…';
+    const resp = await fetch(`/api/servers/${encodeURIComponent(name)}/update`, { method: 'POST' });
+    if (resp.ok) {
+      swToast(`Update queued for ${name}`);
+      updateBtn.textContent = 'Update queued';
+      watchAgentUpdateProgress();
+    } else {
+      swToast('Failed to queue update', 'danger');
+      updateBtn.disabled = false;
+      updateBtn.textContent = 'Update available';
+    }
+    return;
+  }
+
+  // Stop job button
+  const stopBtn = e.target.closest('.stop-job-btn');
+  if (stopBtn) {
+    e.stopPropagation();
+    stopBtn.disabled = true;
+    stopBtn.textContent = 'Stopping…';
+    await stopJob(stopBtn.dataset.jobId);
+    pollJobs();
+    return;
+  }
+
+  // Replay active failure
+  const replayBtn = e.target.closest('.replay-failure-btn');
+  if (replayBtn) {
+    e.stopPropagation();
+    await replayFailure(replayBtn.dataset.jobId, replayBtn);
+    return;
+  }
+
+  // Dismiss active anomaly
+  const anomalyBtn = e.target.closest('.dismiss-anomaly-btn');
+  if (anomalyBtn) {
+    e.stopPropagation();
+    await dismissAnomaly(anomalyBtn.dataset.jobId, anomalyBtn);
+    return;
+  }
+
+  // Dismiss active failure
+  const dismissBtn = e.target.closest('.dismiss-failure-btn');
+  if (dismissBtn) {
+    e.stopPropagation();
+    await dismissFailure(dismissBtn.dataset.jobId, dismissBtn);
+    return;
+  }
+
+  // Tag remove × button
+  const removeBtn = e.target.closest('.tag-remove-btn');
+  if (removeBtn) {
+    e.stopPropagation();
+    const serverId = removeBtn.dataset.serverId;
+    const tag = removeBtn.dataset.tag;
+    const container = document.getElementById(`tags-${serverId}`);
+    const addBtn = container.querySelector('.add-tag-btn');
+    const updated = JSON.parse(addBtn.dataset.currentTags || '[]').filter(t => t !== tag);
+    await setTags(serverId, addBtn.dataset.serverName, updated, addBtn);
+    return;
+  }
+
+  // Tag + button → open picker
+  const addBtn = e.target.closest('.add-tag-btn');
+  if (addBtn) {
+    e.stopPropagation();
+    _pickerServerId = addBtn.dataset.serverId;
+    _pickerServerName = addBtn.dataset.serverName;
+    _pickerBtn = addBtn;
+    const currentTags = JSON.parse(addBtn.dataset.currentTags || '[]');
+    const body = document.getElementById('tag-picker-body');
+    body.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div></div>';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('tagPickerModal')).show();
+    const resp = await fetch('/api/tags/');
+    const allTags = resp.ok ? await resp.json() : [];
+    if (!allTags.length) {
+      body.innerHTML = '<p class="text-muted small mb-0">No tags yet. Use <strong>Manage Tags</strong> to create tags first.</p>';
+      return;
+    }
+    body.innerHTML = allTags.map(tag => `
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" value="${escHtml(tag)}" id="tp-${escHtml(tag)}" ${currentTags.includes(tag) ? 'checked' : ''}>
+        <label class="form-check-label" for="tp-${escHtml(tag)}">${escHtml(tag)}</label>
+      </div>`).join('');
+    return;
+  }
+});
+
+async function setTags(serverId, serverName, tags, btn) {
+  const resp = await fetch(`/api/servers/${encodeURIComponent(serverName)}/tags`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tags}),
+  });
+  if (resp.ok) {
+    renderTagBadges(serverId, (await resp.json()).tags, serverName, btn);
+  } else {
+    swToast('Failed to update tags', 'danger');
+  }
+}
+
+// ── Tag Picker save ──────────────────────────────────────────────────────────
+
+let _pickerServerId = null, _pickerServerName = null, _pickerBtn = null;
+
+document.getElementById('tag-picker-save').addEventListener('click', async () => {
+  const selected = [...document.querySelectorAll('#tag-picker-body input[type=checkbox]:checked')].map(cb => cb.value);
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('tagPickerModal')).hide();
+  await setTags(_pickerServerId, _pickerServerName, selected, _pickerBtn);
+});
+
+// ── Remove server ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.remove-server').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const name = btn.dataset.name;
+    const online = btn.dataset.online === 'true';
+    const body = online
+      ? `The agent on ${name} will be uninstalled automatically. Job history will be deleted.`
+      : `This will delete all job history for ${name}. Scripts assigned to it will remain.`;
+    swConfirm(`Remove "${name}"?`, body, async () => {
+      const resp = await fetch(`/api/servers/${name}/uninstall`, { method: 'POST' });
+      if (resp.ok) {
+        btn.closest('.server-card-wrap').remove();
+        const data = await resp.json();
+        swToast(data.uninstall_queued ? `Uninstall queued on ${name} — agent will stop shortly.` : `Server "${name}" removed.`);
+      } else {
+        swToast('Failed to remove server.', 'danger');
+      }
+    });
+  });
+});
+
+// ── Agent badge auto-refresh (every 15s) ────────────────────────────────────
+
+async function refreshAgentBadges() {
+  try {
+    const [serversResp, hashResp] = await Promise.all([
+      fetch('/api/servers/'),
+      fetch('/api/agent/latest-hash'),
+    ]);
+    if (!serversResp.ok) return;
+    const servers = await serversResp.json();
+    const latestHash = hashResp.ok ? (await hashResp.json()).hash : null;
+    for (const server of servers) {
+      const container = document.getElementById(`agent-badge-${server.name}`);
+      if (!container) continue;
+      const btn = container.querySelector('.update-agent-btn');
+      const hash = server.agent_hash;
+      if (btn && btn.textContent === 'Update queued' && latestHash && hash !== latestHash) continue;
+      if (!latestHash || !hash) {
+        container.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Agent unknown</span>';
+      } else if (hash === latestHash) {
+        container.innerHTML = '<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Up to date</span>';
+      } else {
+        container.innerHTML = `<button class="btn btn-sm btn-warning py-0 px-2 update-agent-btn" data-server-name="${escHtml(server.name)}">Agent update</button>`;
+      }
+    }
+  } catch (_) {}
+}
+
+function watchAgentUpdateProgress() {
+  [3000, 8000, 15000, 30000, 45000].forEach(delay => {
+    setTimeout(refreshAgentBadges, delay);
+  });
+}
+
+setInterval(refreshAgentBadges, 15000);
+
+// ── Manage Tags modal (all inline — no nested modals) ───────────────────────
+
+async function openManageTags() {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('manageTagsModal')).show();
+  await renderManageTagsBody();
+}
+
+async function renderManageTagsBody() {
+  const body = document.getElementById('manage-tags-body');
+  body.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm" role="status"></div></div>';
+  const resp = await fetch('/api/tags/');
+  const tags = resp.ok ? await resp.json() : [];
+
+  let rows = '';
+  if (tags.length) {
+    rows = tags.map((tag, idx) => `
+      <div class="d-flex align-items-center justify-content-between py-2 border-bottom tag-manage-row" data-tag="${escHtml(tag)}" data-row-index="${idx}">
+        <span class="badge bg-secondary">${escHtml(tag)}</span>
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-secondary btn-sm py-0 px-2 tag-edit-btn" data-tag="${escHtml(tag)}"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-outline-danger btn-sm py-0 px-2 tag-delete-btn" data-tag="${escHtml(tag)}"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>`).join('');
+  } else {
+    rows = '<p class="text-muted small mb-2">No tags yet.</p>';
+  }
+
+  body.innerHTML = rows + `
+    <div class="mt-3">
+      <div class="input-group input-group-sm">
+        <input type="text" class="form-control" id="new-tag-input" placeholder="New tag name…">
+        <button class="btn btn-primary" type="button" onclick="tagCreateSubmit()">Add</button>
+      </div>
+    </div>`;
+
+  const inp = document.getElementById('new-tag-input');
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') tagCreateSubmit(); });
+}
+
+async function tagCreateSubmit() {
+  const inp = document.getElementById('new-tag-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  const resp = await fetch('/api/tags/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name}),
+  });
+  if (resp.ok) {
+    await renderManageTagsBody();
+    swToast(`Tag "${name}" created`);
+  } else {
+    swToast((await resp.json()).error || 'Failed', 'danger');
+  }
+}
+
+function tagRowEdit(tag) {
+  const row = document.querySelector(`.tag-manage-row[data-tag="${CSS.escape(tag)}"]`);
+  row.innerHTML = `
+    <div class="input-group input-group-sm flex-grow-1 me-1">
+      <input type="text" class="form-control" id="edit-tag-inp" value="${escHtml(tag)}">
+    </div>
+    <div class="d-flex gap-1 flex-shrink-0">
+      <button class="btn btn-primary btn-sm py-0 px-2 tag-edit-save-btn" data-tag="${escHtml(tag)}">Save</button>
+      <button class="btn btn-secondary btn-sm py-0 px-2" onclick="renderManageTagsBody()">✕</button>
+    </div>`;
+  const inp = document.getElementById('edit-tag-inp');
+  inp.focus(); inp.select();
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') tagEditSubmit(tag);
+    if (e.key === 'Escape') renderManageTagsBody();
+  });
+}
+
+async function tagEditSubmit(oldName) {
+  const newName = (document.getElementById('edit-tag-inp')?.value || '').trim();
+  if (!newName || newName === oldName) { await renderManageTagsBody(); return; }
+  const resp = await fetch(`/api/tags/${encodeURIComponent(oldName)}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: newName}),
+  });
+  if (resp.ok) {
+    domApplyTagRename(oldName, newName);
+    await renderManageTagsBody();
+    swToast(`Renamed to "${newName}"`);
+  } else {
+    swToast((await resp.json()).error || 'Failed', 'danger');
+  }
+}
+
+function tagRowDelete(tag) {
+  const row = document.querySelector(`.tag-manage-row[data-tag="${CSS.escape(tag)}"]`);
+  row.innerHTML = `
+    <span class="text-danger small">Delete "<strong>${escHtml(tag)}</strong>"?</span>
+    <div class="d-flex gap-1">
+      <button class="btn btn-danger btn-sm py-0 px-2 tag-delete-confirm-btn" data-tag="${escHtml(tag)}">Delete</button>
+      <button class="btn btn-secondary btn-sm py-0 px-2" onclick="renderManageTagsBody()">Cancel</button>
+    </div>`;
+}
+
+document.addEventListener('click', e => {
+  const editBtn = e.target.closest('.tag-edit-btn');
+  if (editBtn) {
+    tagRowEdit(editBtn.dataset.tag);
+    return;
+  }
+  const deleteBtn = e.target.closest('.tag-delete-btn');
+  if (deleteBtn) {
+    tagRowDelete(deleteBtn.dataset.tag);
+    return;
+  }
+  const saveBtn = e.target.closest('.tag-edit-save-btn');
+  if (saveBtn) {
+    tagEditSubmit(saveBtn.dataset.tag);
+    return;
+  }
+  const confirmDeleteBtn = e.target.closest('.tag-delete-confirm-btn');
+  if (confirmDeleteBtn) {
+    tagDeleteSubmit(confirmDeleteBtn.dataset.tag);
+  }
+});
+
+async function tagDeleteSubmit(name) {
+  const resp = await fetch(`/api/tags/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (resp.ok) {
+    domApplyTagDelete(name);
+    await renderManageTagsBody();
+    swToast(`Tag "${name}" deleted`);
+  } else {
+    swToast('Failed to delete tag', 'danger');
+  }
+}
+
+const dismissBtn = document.getElementById('dismiss-missed-runs');
+if (dismissBtn) {
+  dismissBtn.addEventListener('click', async () => {
+    await fetch('/api/jobs/missed-runs', { method: 'DELETE' });
+    document.getElementById('missed-runs-alert').remove();
+  });
+}
+</script>
+{% endblock %}

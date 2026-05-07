@@ -1,0 +1,13 @@
+.worktrees/
+scripts/
+data/
+docs/superpowers/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+dev.db
+dist/
+*.egg-info/
+.pytest_cache/

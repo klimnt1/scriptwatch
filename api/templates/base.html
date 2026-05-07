@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ScriptWatch{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('ui.static', filename='favicon.png') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('ui.static', filename='style.css', v='20260506-script-target-runs') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="/">
+        <i class="bi bi-terminal-fill text-success me-2"></i>ScriptWatch
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <div class="navbar-nav ms-auto align-items-lg-center gap-2 mt-2 mt-lg-0 pb-2 pb-lg-0">
+          <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+            <i class="bi bi-grid me-1"></i>Dashboard
+          </a>
+          <a class="nav-link {% if '/scripts' in request.path %}active{% endif %}" href="/scripts">
+            <i class="bi bi-file-code me-1"></i>Scripts
+          </a>
+          <a class="nav-link {% if request.path == '/settings' %}active{% endif %}" href="/settings">
+            <i class="bi bi-gear me-1"></i>Settings
+          </a>
+          <form class="d-flex" onsubmit="event.preventDefault(); const q=this.q.value.trim(); if(q.length>=3) window.location.href='/search?q='+encodeURIComponent(q);">
+            <div class="input-group input-group-sm">
+              <input class="form-control" type="search" name="q" placeholder="Search logs…" style="min-width:0"
+                     value="{{ request.args.get('q', '') if '/search' in request.path else '' }}">
+              <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+            </div>
+          </form>
+          {% if admin_auth_enabled and admin_authenticated %}
+          <form method="post" action="/logout" class="d-flex">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">
+              <i class="bi bi-box-arrow-right me-1"></i>Logout
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="container-fluid px-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+          {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Toast container -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index:1100">
+    <div id="sw-toast" class="toast align-items-center border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body" id="sw-toast-body"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt modal -->
+  <div class="modal fade" id="sw-prompt-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title" id="sw-prompt-title">Input</h6>
+        </div>
+        <div class="modal-body pt-2">
+          <input type="text" class="form-control" id="sw-prompt-input">
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm" id="sw-prompt-ok">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm modal -->
+  <div class="modal fade" id="sw-confirm-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title" id="sw-confirm-title">Confirm</h6>
+        </div>
+        <div class="modal-body pt-2" id="sw-confirm-body"></div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger btn-sm" id="sw-confirm-ok">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('ui.static', filename='app.js', v='20260506-script-target-runs') }}"></script>
+  <script>
+  function swToast(msg, type = 'success') {
+    const el = document.getElementById('sw-toast');
+    el.className = `toast align-items-center border-0 text-bg-${type}`;
+    document.getElementById('sw-toast-body').textContent = msg;
+    bootstrap.Toast.getOrCreateInstance(el, { delay: 3500 }).show();
+  }
+
+  function swPrompt(title, placeholder, defaultValue, onOk) {
+    document.getElementById('sw-prompt-title').textContent = title;
+    const input = document.getElementById('sw-prompt-input');
+    input.placeholder = placeholder || '';
+    input.value = defaultValue || '';
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('sw-prompt-modal'));
+    const okBtn = document.getElementById('sw-prompt-ok');
+    const doOk = () => {
+      const val = input.value.trim();
+      if (!val) return;
+      modal.hide();
+      okBtn.removeEventListener('click', doOk);
+      input.removeEventListener('keydown', keyHandler);
+      onOk(val);
+    };
+    const keyHandler = (e) => { if (e.key === 'Enter') doOk(); };
+    okBtn.addEventListener('click', doOk);
+    input.addEventListener('keydown', keyHandler);
+    modal.show();
+    setTimeout(() => input.select(), 300);
+  }
+
+  function swConfirm(title, body, onOk) {
+    document.getElementById('sw-confirm-title').textContent = title;
+    document.getElementById('sw-confirm-body').textContent = body;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('sw-confirm-modal'));
+    const btn = document.getElementById('sw-confirm-ok');
+    const handler = () => { modal.hide(); btn.removeEventListener('click', handler); onOk(); };
+    btn.addEventListener('click', handler);
+    modal.show();
+  }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

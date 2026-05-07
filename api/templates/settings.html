@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Settings - ScriptWatch{% endblock %}
+{% block content %}
+<div class="sw-section-header">
+  <div>
+    <h4 class="mb-1">Settings</h4>
+    <div class="text-secondary small">Admin security controls for this ScriptWatch instance.</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-7">
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Admin account</h5>
+            <div class="text-secondary small">Username: <span class="font-monospace">{{ admin_username }}</span></div>
+          </div>
+          {% if password_set %}
+            <span class="badge text-bg-success">Password set</span>
+          {% else %}
+            <span class="badge text-bg-warning">Login off</span>
+          {% endif %}
+        </div>
+        {% if not password_set %}
+          <div class="alert alert-warning py-2 small">
+            Set an admin password here to turn on the login page for ScriptWatch.
+          </div>
+        {% endif %}
+        <form method="post" action="/settings/password" class="d-grid gap-3">
+          {% if password_set %}
+          <div>
+            <label class="form-label small text-secondary" for="current-password">Current password</label>
+            <input class="form-control" id="current-password" type="password" name="current_password" autocomplete="current-password" required>
+          </div>
+          {% endif %}
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-secondary" for="new-password">New password</label>
+              <input class="form-control" id="new-password" type="password" name="new_password" autocomplete="new-password" minlength="12" required>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small text-secondary" for="confirm-password">Confirm password</label>
+              <input class="form-control" id="confirm-password" type="password" name="confirm_password" autocomplete="new-password" minlength="12" required>
+            </div>
+          </div>
+          <div>
+            <button class="btn btn-success" type="submit">
+              <i class="bi bi-key me-1"></i>{{ "Reset password" if password_set else "Set password" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Multi-factor authentication</h5>
+            <div class="text-secondary small">Require a six-digit authenticator app code after the admin password.</div>
+          </div>
+          {% if mfa_enabled %}
+            <span class="badge text-bg-success">Enabled</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Disabled</span>
+          {% endif %}
+        </div>
+
+        {% if not password_set %}
+          <div class="alert alert-secondary py-2 small mb-0">
+            MFA can be added after an admin password is set.
+          </div>
+        {% elif mfa_enabled %}
+          <form method="post" action="/settings/mfa/disable" class="sw-settings-inline-form">
+            <div class="flex-grow-1">
+              <label class="form-label small text-secondary" for="disable-password">Admin password</label>
+              <input class="form-control" id="disable-password" type="password" name="password" autocomplete="current-password" required>
+            </div>
+            <button class="btn btn-outline-danger" type="submit">
+              <i class="bi bi-shield-x me-1"></i>Reset MFA
+            </button>
+          </form>
+        {% elif pending_secret %}
+          <div class="sw-mfa-secret mb-3">
+            <div class="text-secondary small mb-1">Manual setup key</div>
+            <code>{{ pending_secret }}</code>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-secondary" for="otpauth-uri">Authenticator URI</label>
+            <input class="form-control font-monospace small" id="otpauth-uri" value="{{ provisioning_uri }}" readonly>
+          </div>
+          <form method="post" action="/settings/mfa/enable" class="sw-settings-inline-form">
+            <div class="flex-grow-1">
+              <label class="form-label small text-secondary" for="otp">Verification code</label>
+              <input class="form-control" id="otp" name="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+            </div>
+            <button class="btn btn-success" type="submit">
+              <i class="bi bi-shield-check me-1"></i>Enable MFA
+            </button>
+          </form>
+        {% else %}
+          <form method="post" action="/settings/mfa/start">
+            <button class="btn btn-success" type="submit">
+              <i class="bi bi-shield-plus me-1"></i>Add MFA
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-5">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Agent onboarding</h5>
+            <div class="text-secondary small">Use this token when registering a new ScriptWatch agent.</div>
+          </div>
+          {% if agent_token_is_default %}
+            <span class="badge text-bg-warning">Default</span>
+          {% else %}
+            <span class="badge text-bg-success">Configured</span>
+          {% endif %}
+        </div>
+
+        {% if not password_set %}
+          <div class="alert alert-secondary py-2 small mb-0">
+            Set an admin password before viewing the agent token.
+          </div>
+        {% else %}
+          {% if agent_token_is_default %}
+            <div class="alert alert-warning py-2 small">
+              Replace the default <span class="font-monospace">AGENT_TOKEN</span> in your environment before onboarding more servers.
+            </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label small text-secondary" for="agent-token">Agent token</label>
+            <div class="input-group">
+              <input class="form-control font-monospace" id="agent-token" type="password" value="{{ agent_token }}" readonly>
+              <button class="btn btn-outline-secondary" type="button" data-toggle-secret="agent-token" title="Reveal token">
+                <i class="bi bi-eye"></i>
+              </button>
+              <button class="btn btn-outline-secondary" type="button" data-copy-target="agent-token" title="Copy token">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small text-secondary" for="agent-env">Agent environment</label>
+            <textarea class="form-control font-monospace small sw-token-snippet" id="agent-env" readonly>SCRIPTWATCH_API_URL={{ agent_base_url }}
+SCRIPTWATCH_AGENT_TOKEN={{ agent_token }}</textarea>
+            <div class="d-flex justify-content-end mt-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button" data-copy-target="agent-env">
+                <i class="bi bi-clipboard me-1"></i>Copy
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label small text-secondary">Install on a new server</label>
+            <ul class="nav nav-tabs mb-3" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-docker-btn" data-bs-toggle="tab" data-bs-target="#tab-docker" type="button" role="tab" aria-controls="tab-docker">
+                  <i class="bi bi-box me-1"></i>Docker Compose
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-systemd-btn" data-bs-toggle="tab" data-bs-target="#tab-systemd" type="button" role="tab" aria-controls="tab-systemd">
+                  <i class="bi bi-terminal me-1"></i>Systemd
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-oneliner-btn" data-bs-toggle="tab" data-bs-target="#tab-oneliner" type="button" role="tab" aria-controls="tab-oneliner">
+                  <i class="bi bi-lightning me-1"></i>One-liner
+                </button>
+              </li>
+            </ul>
+            <div class="tab-content">
+              <div class="tab-pane fade show active" id="tab-docker" role="tabpanel" aria-labelledby="tab-docker-btn">
+                <ol class="small mb-3 ps-3">
+                  <li class="mb-1">SSH into the new server.</li>
+                  <li class="mb-1">
+                    <a class="btn btn-sm btn-outline-secondary" href="/agent/download/docker-compose.yml" download>
+                      <i class="bi bi-download me-1"></i>Download docker-compose.yml
+                    </a>
+                    — open it and set <code>SCRIPTWATCH_SERVER_NAME</code> to the server's name.
+                  </li>
+                  <li class="mb-1">Copy it to the server and run <code>docker compose up -d</code>.</li>
+                </ol>
+              </div>
+              <div class="tab-pane fade" id="tab-systemd" role="tabpanel" aria-labelledby="tab-systemd-btn">
+                <ol class="small mb-3 ps-3">
+                  <li class="mb-1">SSH into the new server.</li>
+                  <li class="mb-1">
+                    <a class="btn btn-sm btn-outline-secondary" href="/agent/download/install.sh" download>
+                      <i class="bi bi-download me-1"></i>Download install.sh
+                    </a>
+                    — transfer it to the server, e.g. <code>scp install.sh user@server:~</code>.
+                  </li>
+                  <li class="mb-1">Run <code>sudo bash install.sh</code> — enter the server name only; API URL and token are pre-filled.</li>
+                </ol>
+              </div>
+              <div class="tab-pane fade" id="tab-oneliner" role="tabpanel" aria-labelledby="tab-oneliner-btn">
+                <p class="small text-secondary mb-2">Run on the new server — replace <code>your-server-name</code>:</p>
+                <div class="input-group">
+                  <textarea class="form-control font-monospace small" id="agent-install-oneliner" readonly rows="1">curl -fsSL "{{ agent_base_url }}/install/your-server-name" | sudo bash</textarea>
+                  <button class="btn btn-outline-secondary align-self-start" type="button" data-copy-target="agent-install-oneliner" title="Copy">
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-toggle-secret]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const input = document.getElementById(button.dataset.toggleSecret);
+    const icon = button.querySelector('i');
+    const revealing = input.type === 'password';
+    input.type = revealing ? 'text' : 'password';
+    icon.className = revealing ? 'bi bi-eye-slash' : 'bi bi-eye';
+  });
+});
+
+document.querySelectorAll('[data-copy-target]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const input = document.getElementById(button.dataset.copyTarget);
+    await navigator.clipboard.writeText(input.value);
+    swToast('Copied to clipboard');
+  });
+});
+</script>
+{% endblock %}

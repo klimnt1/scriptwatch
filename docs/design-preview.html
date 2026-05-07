@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScriptWatch Design Preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101316;
+      --panel: #171b1f;
+      --panel-2: #1d2228;
+      --line: #303841;
+      --muted: #8f9ba8;
+      --text: #e8edf2;
+      --green: #27c078;
+      --yellow: #e3b341;
+      --red: #ee5d5d;
+      --blue: #6bb7ff;
+      --chip: #252c34;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .topbar {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: #15191e;
+    }
+    .brand { font-weight: 800; letter-spacing: 0; margin-right: auto; }
+    .nav { display: flex; gap: 4px; }
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 7px 10px;
+      border-radius: 6px;
+    }
+    .nav a.active { color: var(--text); background: #20262d; }
+    .search {
+      width: 230px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: var(--muted);
+      background: #11161b;
+    }
+    main {
+      padding: 18px;
+      display: grid;
+      gap: 22px;
+    }
+    .page-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 15px; }
+    h3 { font-size: 13px; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 9px;
+      font: inherit;
+    }
+    .btn.green { border-color: rgba(39,192,120,.45); color: #9df0c1; }
+    .btn.yellow { border-color: rgba(227,179,65,.45); color: #ffe08a; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .stat {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 46px;
+      padding: 9px 11px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+    .stat strong { font-size: 21px; line-height: 1; }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 290px;
+      gap: 12px;
+      align-items: start;
+    }
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .server-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+      gap: 8px;
+    }
+    .server-card {
+      min-height: 116px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--green);
+      border-radius: 7px;
+      background: linear-gradient(180deg, #1a1f24, #161a1f);
+    }
+    .server-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 9px;
+    }
+    .status {
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 11px;
+      color: #06160d;
+      background: var(--green);
+      font-weight: 700;
+    }
+    .meta-line { color: var(--muted); font-size: 12px; margin: 6px 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--chip);
+      color: #cbd4dd;
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+    .chip.green { color: #9df0c1; border-color: rgba(39,192,120,.28); }
+    .side-panel {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      padding: 11px;
+    }
+    .tag-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .tag-row:last-child { border-bottom: 0; }
+    .mini-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .table-card {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 9px 11px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      background: #14191e;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .scripts-layout {
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 560px;
+    }
+    .script-list {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .list-tools {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .filter-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 9px;
+      color: var(--muted);
+      background: #11161b;
+    }
+    .script-item {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .script-item.active {
+      background: #20262d;
+      border-left: 3px solid var(--blue);
+      padding-left: 7px;
+    }
+    .detail-panel {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #171d22;
+    }
+    .detail-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 12px;
+      padding: 12px;
+    }
+    .code {
+      min-height: 340px;
+      border: 1px solid #28313a;
+      border-radius: 7px;
+      background: #0d1115;
+      color: #ced7df;
+      padding: 12px;
+      white-space: pre-wrap;
+      font: 12px/1.55 "SFMono-Regular", Consolas, monospace;
+    }
+    .info-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .info-box {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #151a1f;
+      padding: 10px;
+    }
+    .scripts-table-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 12px;
+      align-items: start;
+    }
+    .inventory-tools {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .script-row-selected {
+      background: #20262d;
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+    .preview-panel {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel);
+      overflow: hidden;
+      position: sticky;
+      top: 64px;
+    }
+    .preview-body {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+    }
+    .preview-kv {
+      display: grid;
+      gap: 4px;
+      padding: 9px;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      background: #151a1f;
+    }
+    @media (max-width: 900px) {
+      .stats, .dashboard-grid, .scripts-layout, .detail-body, .scripts-table-layout, .inventory-tools {
+        grid-template-columns: 1fr;
+      }
+      .search { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">ScriptWatch</div>
+    <nav class="nav">
+      <a class="active" href="#dashboard">Dashboard</a>
+      <a href="#scripts">Scripts</a>
+    </nav>
+    <div class="search">Search logs...</div>
+  </div>
+
+  <main>
+    <section id="dashboard">
+      <div class="page-title">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="subtle">A compact live view for server health, dispatch state, and recent runs.</p>
+        </div>
+        <button class="btn yellow">Update Outdated</button>
+      </div>
+
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><span class="subtle">Running</span><strong>0</strong></div>
+        <div class="stat"><span class="subtle">Runs Today</span><strong>14</strong></div>
+        <div class="stat"><span class="subtle">Success</span><strong style="color:var(--green)">13</strong></div>
+        <div class="stat"><span class="subtle">Failures</span><strong style="color:var(--red)">1</strong></div>
+      </div>
+
+      <div class="dashboard-grid" style="margin-top:14px">
+        <div>
+          <div class="section-head">
+            <div>
+              <h2>Servers</h2>
+              <p class="subtle">Small tiles, left-to-right, dense enough for repeated scanning.</p>
+            </div>
+            <button class="btn">Manage Tags</button>
+          </div>
+          <div class="server-grid">
+            <article class="server-card">
+              <div class="server-top"><div><h3>Backups-Tower</h3><p class="subtle">Backups-Tower.local</p></div><span class="status">Online</span></div>
+              <div class="meta-line">Last seen: 9s ago</div>
+              <span class="chip green">Agent current</span>
+              <div class="chips"><span class="chip">server</span><span class="chip">backup</span></div>
+            </article>
+            <article class="server-card">
+              <div class="server-top"><div><h3>debianvm</h3><p class="subtle">debian-vm.plexusprime.net</p></div><span class="status">Online</span></div>
+              <div class="meta-line">Last seen: 3s ago</div>
+              <span class="chip green">Agent current</span>
+              <div class="chips"><span class="chip">linuxvm</span></div>
+            </article>
+            <article class="server-card">
+              <div class="server-top"><div><h3>dns-alpha</h3><p class="subtle">dns-alpha</p></div><span class="status">Online</span></div>
+              <div class="meta-line">Last seen: 9s ago</div>
+              <span class="chip green">Agent current</span>
+              <div class="chips"><span class="chip">role:dns</span><span class="chip">env:prod</span></div>
+            </article>
+            <article class="server-card">
+              <div class="server-top"><div><h3>dns-beta</h3><p class="subtle">dns-beta</p></div><span class="status">Online</span></div>
+              <div class="meta-line">Last seen: 26s ago</div>
+              <span class="chip green">Agent current</span>
+              <div class="chips"><span class="chip">role:dns</span></div>
+            </article>
+            <article class="server-card">
+              <div class="server-top"><div><h3>Plexusprime</h3><p class="subtle">PlexusPrime.local</p></div><span class="status">Online</span></div>
+              <div class="meta-line">Last seen: 1s ago</div>
+              <span class="chip green">Agent current</span>
+              <div class="chips"><span class="chip">server</span></div>
+            </article>
+          </div>
+        </div>
+
+        <aside class="side-panel">
+          <div class="section-head">
+            <div>
+              <h2>Tag Groups</h2>
+              <p class="subtle">Quick filters</p>
+            </div>
+          </div>
+          <div class="tag-row"><div><strong>role</strong><p class="subtle">dns, backup</p></div><span class="mini-count">3</span></div>
+          <div class="tag-row"><div><strong>env</strong><p class="subtle">prod, lab</p></div><span class="mini-count">2</span></div>
+          <div class="tag-row"><div><strong>other</strong><p class="subtle">server, linuxvm</p></div><span class="mini-count">5</span></div>
+        </aside>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="section-head">
+          <div><h2>Recent Jobs</h2><p class="subtle">Dense history table with status-first scanning.</p></div>
+          <span class="subtle">142 total</span>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Script</th><th>Server</th><th>Status</th><th>Started</th><th>Duration</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>backup-home</td><td>Backups-Tower</td><td><span class="chip green">Success</span></td><td>2m ago</td><td>18s</td><td><button class="btn">Logs</button></td></tr>
+              <tr><td>dns-health</td><td>dns-alpha</td><td><span class="chip green">Success</span></td><td>7m ago</td><td>4s</td><td><button class="btn">Logs</button></td></tr>
+              <tr><td>plex-refresh</td><td>Plexusprime</td><td><span class="chip">Pending</span></td><td>now</td><td>--</td><td><button class="btn">Logs</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="scripts">
+      <div class="page-title">
+        <div>
+          <h1>Scripts</h1>
+          <p class="subtle">Inventory on the left, selected script details on the right.</p>
+        </div>
+        <button class="btn green">New Script</button>
+      </div>
+
+      <div class="scripts-layout" style="margin-top:12px">
+        <aside class="script-list">
+          <div class="list-tools">
+            <input class="filter-input" value="Search scripts...">
+            <div class="chips"><span class="chip green">Enabled 8</span><span class="chip">Manual 5</span><span class="chip">Scheduled 6</span></div>
+          </div>
+          <div class="script-item active"><strong>backup-home</strong><span class="subtle">Backups-Tower · daily 02:00</span><div class="chips"><span class="chip green">enabled</span><span class="chip">server</span></div></div>
+          <div class="script-item"><strong>dns-health</strong><span class="subtle">dns-alpha, dns-beta · */15 * * * *</span><div class="chips"><span class="chip green">enabled</span><span class="chip">role:dns</span></div></div>
+          <div class="script-item"><strong>plex-refresh</strong><span class="subtle">Plexusprime · manual</span><div class="chips"><span class="chip green">enabled</span><span class="chip">media</span></div></div>
+          <div class="script-item"><strong>apt-updates</strong><span class="subtle">linuxvm · weekly</span><div class="chips"><span class="chip">disabled</span></div></div>
+        </aside>
+
+        <section class="detail-panel">
+          <div class="detail-head">
+            <div>
+              <h2>backup-home</h2>
+              <p class="subtle">Nightly archive job for local backup storage.</p>
+            </div>
+            <div class="chips"><button class="btn green">Run</button><button class="btn">Edit</button><button class="btn">History</button></div>
+          </div>
+          <div class="detail-body">
+            <pre class="code">#!/bin/bash
+set -euo pipefail
+
+rsync -a --delete /home/ /mnt/backups/home/
+find /mnt/backups/home -type f -mtime +60 -delete
+echo "backup complete"</pre>
+            <aside class="info-grid">
+              <div class="info-box"><h3>Status</h3><p class="subtle">Enabled · last success 2m ago · 18s</p></div>
+              <div class="info-box"><h3>Targets</h3><div class="chips"><span class="chip">Backups-Tower</span><span class="chip">server</span></div></div>
+              <div class="info-box"><h3>Schedule</h3><p class="subtle">0 2 * * * on Backups-Tower</p></div>
+              <div class="info-box"><h3>Recent Runs</h3><p class="subtle">Success 2m ago<br>Success yesterday<br>Failure May 3</p></div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="scripts-option-a">
+      <div class="page-title">
+        <div>
+          <h1>Scripts Option A</h1>
+          <p class="subtle">Keep the dense table, add a preview panel for the selected script.</p>
+        </div>
+        <button class="btn green">New Script</button>
+      </div>
+
+      <div class="inventory-tools">
+        <input class="filter-input" value="Search scripts, servers, schedules...">
+        <div class="chips" style="margin-top:0"><span class="chip green">Enabled 8</span><span class="chip">Scheduled 6</span><span class="chip">Manual 5</span><span class="chip">Disabled 1</span></div>
+      </div>
+
+      <div class="scripts-table-layout">
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Script</th><th>Targets</th><th>Schedule</th><th>Status</th><th>Last Run</th><th></th></tr></thead>
+            <tbody>
+              <tr class="script-row-selected">
+                <td><strong>backup-home</strong><p class="subtle">Nightly archive job</p></td>
+                <td><span class="chip">Backups-Tower</span></td>
+                <td class="subtle">0 2 * * *</td>
+                <td><span class="chip green">Enabled</span></td>
+                <td><span class="chip green">Success</span> <span class="subtle">2m ago</span></td>
+                <td><button class="btn green">Run</button></td>
+              </tr>
+              <tr>
+                <td><strong>dns-health</strong><p class="subtle">Validate DNS responders</p></td>
+                <td><span class="chip">dns-alpha</span> <span class="chip">dns-beta</span></td>
+                <td class="subtle">*/15 * * * *</td>
+                <td><span class="chip green">Enabled</span></td>
+                <td><span class="chip green">Success</span> <span class="subtle">7m ago</span></td>
+                <td><button class="btn green">Run</button></td>
+              </tr>
+              <tr>
+                <td><strong>plex-refresh</strong><p class="subtle">Refresh Plex metadata</p></td>
+                <td><span class="chip">Plexusprime</span></td>
+                <td class="subtle">Manual only</td>
+                <td><span class="chip green">Enabled</span></td>
+                <td><span class="chip">Pending</span> <span class="subtle">now</span></td>
+                <td><button class="btn green">Run</button></td>
+              </tr>
+              <tr>
+                <td><strong>apt-updates</strong><p class="subtle">Weekly package updates</p></td>
+                <td><span class="chip">linuxvm</span></td>
+                <td class="subtle">0 4 * * 0</td>
+                <td><span class="chip">Disabled</span></td>
+                <td><span class="subtle">Never</span></td>
+                <td><button class="btn">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <aside class="preview-panel">
+          <div class="detail-head">
+            <div>
+              <h2>backup-home</h2>
+              <p class="subtle">Selected table row preview</p>
+            </div>
+            <div class="chips"><button class="btn green">Run</button><button class="btn">Edit</button></div>
+          </div>
+          <div class="preview-body">
+            <div class="preview-kv"><h3>Status</h3><p class="subtle">Enabled · last success 2m ago · 18s</p></div>
+            <div class="preview-kv"><h3>Targets</h3><div class="chips"><span class="chip">Backups-Tower</span><span class="chip">server</span></div></div>
+            <div class="preview-kv"><h3>Schedule</h3><p class="subtle">0 2 * * * on Backups-Tower</p></div>
+            <div class="preview-kv"><h3>Recent Runs</h3><p class="subtle">Success 2m ago<br>Success yesterday<br>Failure May 3</p></div>
+            <div class="preview-kv"><h3>Repository</h3><p class="subtle">scripts/backup-home.sh</p></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,11 @@
+services:
+  scriptwatch-agent:
+    image: gitea.plexusprime.net/adrianoropesa/scriptwatch-agent:latest
+    container_name: ScriptWatch-Agent
+    restart: unless-stopped
+    environment:
+      SCRIPTWATCH_API_URL: http://192.168.20.244:8095
+      SCRIPTWATCH_SERVER_NAME: change-me
+      SCRIPTWATCH_AGENT_TOKEN: your-agent-token-here
+      POLL_INTERVAL: 10
+      HEARTBEAT_INTERVAL: 30

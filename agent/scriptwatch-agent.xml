@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>ScriptWatch-Agent</Name>
+  <Repository>gitea.plexusprime.net/adrianoropesa/scriptwatch-agent:latest</Repository>
+  <Registry/>
+  <Network>host</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>ScriptWatch Agent — polls the central ScriptWatch API for pending jobs, executes scripts locally on this Unraid server, and reports results back. Sends a heartbeat every 30 seconds to keep the server green on the dashboard.</Overview>
+  <Category>Tools:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="API URL" Target="SCRIPTWATCH_API_URL" Default="http://plexusprime:8095" Mode="" Description="URL of the ScriptWatch central API" Type="Variable" Display="always" Required="true" Mask="false">http://plexusprime:8095</Config>
+  <Config Name="Server Name" Target="SCRIPTWATCH_SERVER_NAME" Default="unraid" Mode="" Description="Unique name for this server as it appears in the ScriptWatch dashboard" Type="Variable" Display="always" Required="true" Mask="false">unraid</Config>
+  <Config Name="Agent Token" Target="SCRIPTWATCH_AGENT_TOKEN" Default="" Mode="" Description="Secret token — must match AGENT_TOKEN in your ScriptWatch API .env file" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Poll Interval" Target="POLL_INTERVAL" Default="10" Mode="" Description="Seconds between job polls" Type="Variable" Display="advanced" Required="false" Mask="false">10</Config>
+  <Config Name="Heartbeat Interval" Target="HEARTBEAT_INTERVAL" Default="30" Mode="" Description="Seconds between heartbeat pings" Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+</Container>

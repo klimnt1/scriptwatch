@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /app/data
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/scriptwatch.db}
+      SCRIPT_STORE_DIR: ${SCRIPT_STORE_DIR:-/app/data/script-store}
+      AGENT_TOKEN: ${AGENT_TOKEN}
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      NTFY_URL: ${NTFY_URL:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      BASE_URL: ${BASE_URL:-}
+      MISSED_RUN_GRACE_MINUTES: ${MISSED_RUN_GRACE_MINUTES:-15}
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8080:8080"

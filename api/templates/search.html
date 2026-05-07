@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Search Logs — ScriptWatch{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col-lg-8">
+    <h4 class="mb-3">Search Job Output</h4>
+    <div class="input-group">
+      <input type="text" class="form-control" id="search-input" placeholder="Search across all job logs…"
+             value="{{ request.args.get('q', '') }}" autofocus>
+      <button class="btn btn-primary" id="search-btn">
+        <i class="bi bi-search me-1"></i>Search
+      </button>
+    </div>
+    <div class="text-muted small mt-1">Minimum 3 characters. Shows up to 50 most recent matches.</div>
+  </div>
+</div>
+
+<div id="search-results"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const initialQ = {{ request.args.get('q', '') | tojson }};
+if (initialQ && initialQ.length >= 3) runSearch(initialQ);
+
+document.getElementById('search-btn').addEventListener('click', () => {
+  const q = document.getElementById('search-input').value.trim();
+  if (q.length < 3) { swToast('Enter at least 3 characters', 'warning'); return; }
+  history.replaceState(null, '', `/search?q=${encodeURIComponent(q)}`);
+  runSearch(q);
+});
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('search-btn').click();
+});
+
+function statusBadge(status) {
+  const map = { success: 'bg-success', failure: 'bg-danger', timeout: 'bg-warning text-dark', running: 'bg-warning text-dark' };
+  return `<span class="badge ${map[status] || 'bg-secondary'}">${status}</span>`;
+}
+
+function highlight(text, q) {
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return escHtml(text);
+  return escHtml(text.slice(0, idx))
+    + `<mark class="bg-warning text-dark px-0">${escHtml(text.slice(idx, idx + q.length))}</mark>`
+    + escHtml(text.slice(idx + q.length));
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function runSearch(q) {
+  const container = document.getElementById('search-results');
+  container.innerHTML = '<div class="text-muted py-3">Searching…</div>';
+  try {
+    const resp = await fetch(`/api/jobs/search?q=${encodeURIComponent(q)}`);
+    const data = await resp.json();
+    if (!resp.ok) { container.innerHTML = `<div class="text-danger">${escHtml(data.error || 'Error')}</div>`; return; }
+    if (!data.length) { container.innerHTML = '<div class="text-muted py-3">No matches found.</div>'; return; }
+    container.innerHTML = `
+      <div class="text-muted small mb-3">${data.length} result${data.length !== 1 ? 's' : ''}</div>
+      <div class="list-group">
+        ${data.map(r => `
+          <a href="/jobs/${r.id}" class="list-group-item list-group-item-action py-3">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <span class="fw-semibold">${escHtml(r.script_name || '—')}</span>
+              <div class="d-flex gap-2 align-items-center ms-3 flex-shrink-0">
+                ${statusBadge(r.status)}
+                <span class="badge bg-secondary">${escHtml(r.server_name || '—')}</span>
+                <span class="text-muted small">#${r.id}</span>
+              </div>
+            </div>
+            <pre class="mb-0 mt-1 p-2 rounded small" style="background:var(--bs-tertiary-bg);white-space:pre-wrap;word-break:break-all;max-height:120px;overflow:hidden">${highlight(r.snippet, q)}</pre>
+          </a>`).join('')}
+      </div>`;
+  } catch {
+    container.innerHTML = '<div class="text-danger">Search failed — check API logs.</div>';
+  }
+}
+</script>
+{% endblock %}

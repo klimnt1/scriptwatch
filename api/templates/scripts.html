@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+{% block body_class %}sw-scripts-page{% endblock %}
+{% block title %}Scripts - ScriptWatch{% endblock %}
+
+{% block content %}
+{% set ns = namespace(enabled=0, disabled=0, scheduled=0, manual_only=0) %}
+{% for script in scripts %}
+  {% if script.enabled %}
+    {% set ns.enabled = ns.enabled + 1 %}
+  {% else %}
+    {% set ns.disabled = ns.disabled + 1 %}
+  {% endif %}
+  {% set schedules = script.server_assignments | selectattr('schedule') | list %}
+  {% if schedules %}
+    {% set ns.scheduled = ns.scheduled + 1 %}
+  {% else %}
+    {% set ns.manual_only = ns.manual_only + 1 %}
+  {% endif %}
+{% endfor %}
+
+<div class="sw-section-header mt-0">
+  <div>
+    <h4 class="mb-0">Scripts</h4>
+    <div class="text-muted small">Inventory on the left, selected script details on the right</div>
+  </div>
+  <div class="col-auto">
+    <a href="/scripts/new" class="btn btn-success btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>New Script
+    </a>
+  </div>
+</div>
+
+{% if scripts %}
+<div class="sw-scripts-console">
+  <aside class="sw-script-list-panel">
+    <div class="sw-script-list-tools">
+      <button class="btn btn-outline-secondary btn-sm sw-script-mobile-back" type="button" id="script-mobile-back">
+        <i class="bi bi-chevron-left me-1"></i>All Scripts
+      </button>
+      <div class="sw-script-search">
+        <i class="bi bi-search text-muted"></i>
+        <input class="form-control form-control-sm" id="script-filter-input" type="search" placeholder="Filter scripts, servers, schedules...">
+      </div>
+      <div class="sw-script-summary">
+        <div class="sw-script-stat">
+          <span class="sw-script-stat-value">{{ scripts|length }}</span>
+          <span class="sw-script-stat-label">Total</span>
+        </div>
+        <div class="sw-script-stat">
+          <span class="sw-script-stat-value text-success">{{ ns.enabled }}</span>
+          <span class="sw-script-stat-label">Enabled</span>
+        </div>
+        <div class="sw-script-stat">
+          <span class="sw-script-stat-value text-info">{{ ns.scheduled }}</span>
+          <span class="sw-script-stat-label">Scheduled</span>
+        </div>
+        <div class="sw-script-stat">
+          <span class="sw-script-stat-value text-warning">{{ ns.manual_only }}</span>
+          <span class="sw-script-stat-label">Manual</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sw-script-list" id="script-list">
+      {% for script in scripts %}
+      {% set schedules = script.server_assignments | selectattr('schedule') | list %}
+      {% set last_job = script.jobs | sort(attribute='created_at') | last if script.jobs else None %}
+      <button class="sw-script-list-item {% if loop.first %}active{% endif %}"
+              type="button"
+              data-script-id="{{ script.id }}"
+              data-filter-text="{{ (script.name ~ ' ' ~ (script.description or '') ~ ' ' ~ (script.servers | map(attribute='name') | join(' ')) ~ ' ' ~ (schedules | map(attribute='schedule') | join(' '))) | lower }}">
+        <span class="sw-script-dot {% if script.enabled %}bg-success{% else %}bg-secondary{% endif %}"></span>
+        <span class="min-w-0">
+          <span class="d-flex justify-content-between align-items-start gap-2">
+            <strong class="text-truncate">{{ script.name }}</strong>
+            {% if last_job and last_job.status == "failure" %}
+              <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">Failed</span>
+            {% elif last_job and last_job.status == "success" %}
+              <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">OK</span>
+            {% elif last_job %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ last_job.status|capitalize }}</span>
+            {% endif %}
+          </span>
+          <span class="text-muted small text-truncate d-block">
+            {% if script.servers %}{{ script.servers | map(attribute='name') | join(', ') }}{% else %}No targets{% endif %}
+            · {% if schedules %}scheduled{% else %}manual only{% endif %}
+          </span>
+          <span class="d-flex flex-wrap gap-1 mt-1">
+            {% if script.enabled %}
+              <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Enabled</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Disabled</span>
+            {% endif %}
+            {% if script.manual_trigger %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Manual</span>
+            {% endif %}
+          </span>
+        </span>
+      </button>
+      {% endfor %}
+      <div class="text-muted small p-3" id="script-filter-empty" style="display:none">No scripts match that filter.</div>
+    </div>
+  </aside>
+
+  <section class="sw-script-detail-panel">
+    {% for script in scripts %}
+    {% set schedules = script.server_assignments | selectattr('schedule') | list %}
+    {% set last_job = script.jobs | sort(attribute='created_at') | last if script.jobs else None %}
+    {% set recent_jobs = (script.jobs | sort(attribute='created_at') | reverse | list)[:4] if script.jobs else [] %}
+    <article class="sw-script-detail {% if not loop.first %}d-none{% endif %}" data-script-panel="{{ script.id }}">
+      <div class="sw-script-detail-head">
+        <div class="min-w-0">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="sw-script-dot {% if script.enabled %}bg-success{% else %}bg-secondary{% endif %}"></span>
+            <h5 class="mb-0 text-truncate">{{ script.name }}</h5>
+          </div>
+          <div class="text-muted small">
+            {% if script.description %}{{ script.description }}{% else %}No description{% endif %}
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 justify-content-end">
+          {% if script.manual_trigger and script.servers %}
+          <button class="btn btn-sm btn-outline-success"
+                  onclick="triggerAll({{ script.id }}, {{ script.servers | map(attribute='id') | list | tojson }})">
+            <i class="bi bi-play-fill me-1"></i>Run All
+          </button>
+          {% endif %}
+          <a href="/scripts/{{ script.id }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </a>
+          <a href="/?script_id={{ script.id }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-clock-history me-1"></i>History
+          </a>
+        </div>
+      </div>
+
+      <div class="sw-script-detail-body">
+        <div class="sw-script-code-wrap">
+          <pre class="sw-script-code-preview" data-code-preview="{{ script.id }}">Loading preview...</pre>
+        </div>
+
+        <aside class="sw-script-side-info">
+          <div class="sw-script-info-box">
+            <h6>Status</h6>
+            <div class="text-muted small">
+              {% if script.enabled %}Enabled{% else %}Disabled{% endif %}
+              {% if last_job %}
+                · last {{ last_job.status }} <span class="relative-time" data-ts="{{ last_job.created_at }}">{{ last_job.created_at }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="sw-script-info-box">
+            <h6>Targets</h6>
+            <div class="d-flex flex-wrap gap-1">
+              {% for server in script.servers %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">{{ server.name }}</span>
+              {% else %}
+                <span class="text-muted small">No servers assigned</span>
+              {% endfor %}
+            </div>
+            {% if script.manual_trigger and script.servers %}
+            <div class="sw-script-target-actions">
+              {% for server in script.servers %}
+              <button class="btn btn-success btn-sm"
+                      type="button"
+                      onclick="triggerAll({{ script.id }}, [{{ server.id }}])">
+                <i class="bi bi-play-fill me-1"></i>Run on {{ server.name }}
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="sw-script-info-box">
+            <h6>Schedule</h6>
+            {% if schedules %}
+              <div class="sw-script-schedule-list">
+                {% for sa in schedules %}
+                  <div><span class="text-secondary">{{ sa.server.name }}:</span> {{ sa.schedule }}</div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="text-muted small">Manual only</span>
+            {% endif %}
+          </div>
+          <div class="sw-script-info-box">
+            <h6>Recent Runs</h6>
+            {% if recent_jobs %}
+              <div class="sw-script-runs">
+                {% for job in recent_jobs %}
+                  <a href="/jobs/{{ job.id }}" class="sw-script-run-row">
+                    <span>
+                      {% if job.status == "success" %}
+                        <span class="text-success">Success</span>
+                      {% elif job.status == "failure" %}
+                        <span class="text-danger">Failed</span>
+                      {% elif job.status == "timeout" %}
+                        <span class="text-warning">Timeout</span>
+                      {% else %}
+                        <span class="text-warning">{{ job.status|capitalize }}</span>
+                      {% endif %}
+                    </span>
+                    <span class="text-muted relative-time" data-ts="{{ job.created_at }}">{{ job.created_at }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="text-muted small">No runs yet</span>
+            {% endif %}
+          </div>
+          <div class="sw-script-info-box">
+            <h6>Repository</h6>
+            <div class="text-muted small text-break">{{ script.gitea_path or "No local script path yet" }}</div>
+          </div>
+          <div class="sw-script-info-box">
+            <h6>Local Versions</h6>
+            <div class="sw-script-versions" data-version-list="{{ script.id }}">
+              <span class="text-muted small">Loading versions...</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-file-code display-6 d-block mb-2"></i>
+  No scripts yet. <a href="/scripts/new">Add your first script</a>.
+</div>
+{% endif %}
+
+<div class="modal fade" id="scriptVersionModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h5 class="modal-title mb-0" id="script-version-title">Script version</h5>
+          <div class="text-muted small font-monospace" id="script-version-ref"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <pre class="sw-version-code sw-version-diff m-0 p-3" id="script-version-content">Loading version...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function triggerAll(scriptId, serverIds) {
+  const resp = await fetch(`/api/scripts/${scriptId}/trigger`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({server_ids: serverIds}),
+  });
+  if (resp.ok) {
+    const jobs = await resp.json();
+    window.location.href = jobs.length === 1 ? `/jobs/${jobs[0].id}` : "/";
+  } else {
+    swToast("Failed to trigger script", "danger");
+  }
+}
+
+function isMobileScriptsLayout() {
+  return window.matchMedia('(max-width: 991.98px)').matches;
+}
+
+function clearScriptSelection() {
+  document.querySelector('.sw-scripts-console')?.classList.remove('sw-mobile-script-picked');
+  document.querySelectorAll('.sw-script-list-item').forEach(item => {
+    item.classList.remove('active');
+    item.classList.remove('sw-mobile-hidden');
+  });
+  document.querySelectorAll('.sw-script-detail').forEach(panel => {
+    panel.classList.add('d-none');
+  });
+  const url = new URL(window.location.href);
+  url.searchParams.delete('script_id');
+  window.history.replaceState({}, '', url);
+}
+
+function selectScript(scriptId, options = {}) {
+  document.querySelectorAll('.sw-script-list-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.scriptId === scriptId);
+    item.classList.toggle('sw-mobile-hidden', isMobileScriptsLayout() && item.dataset.scriptId !== scriptId);
+  });
+  document.querySelector('.sw-scripts-console')?.classList.toggle('sw-mobile-script-picked', isMobileScriptsLayout());
+  document.querySelectorAll('.sw-script-detail').forEach(panel => {
+    panel.classList.toggle('d-none', panel.dataset.scriptPanel !== scriptId);
+  });
+  loadScriptPreview(scriptId);
+  loadScriptVersions(scriptId);
+  const url = new URL(window.location.href);
+  url.searchParams.set('script_id', scriptId);
+  window.history.replaceState({}, '', url);
+  if (options.scrollToDetail) {
+    document.querySelector(`[data-script-panel="${scriptId}"]`)?.scrollIntoView({block: 'start', behavior: 'smooth'});
+  }
+}
+
+async function loadScriptPreview(scriptId) {
+  const el = document.querySelector(`[data-code-preview="${scriptId}"]`);
+  if (!el || el.dataset.loaded === 'true') return;
+  el.textContent = 'Loading preview...';
+  try {
+    const resp = await fetch(`/api/scripts/${scriptId}`);
+    if (!resp.ok) throw new Error('request failed');
+    const data = await resp.json();
+    el.textContent = data.content || 'Script preview unavailable. Open Edit to view or update this script.';
+    el.dataset.loaded = 'true';
+  } catch (_) {
+    el.textContent = 'Script preview unavailable. Open Edit to view or update this script.';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function diffLines(oldText, newText) {
+  const oldLines = String(oldText || '').split('\n');
+  const newLines = String(newText || '').split('\n');
+  const rows = Array.from({length: oldLines.length + 1}, () => Array(newLines.length + 1).fill(0));
+  for (let i = oldLines.length - 1; i >= 0; i--) {
+    for (let j = newLines.length - 1; j >= 0; j--) {
+      rows[i][j] = oldLines[i] === newLines[j]
+        ? rows[i + 1][j + 1] + 1
+        : Math.max(rows[i + 1][j], rows[i][j + 1]);
+    }
+  }
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < oldLines.length && j < newLines.length) {
+    if (oldLines[i] === newLines[j]) {
+      out.push({type: 'same', text: oldLines[i]});
+      i++;
+      j++;
+    } else if (rows[i + 1][j] >= rows[i][j + 1]) {
+      out.push({type: 'old', text: oldLines[i++]});
+    } else {
+      out.push({type: 'new', text: newLines[j++]});
+    }
+  }
+  while (i < oldLines.length) out.push({type: 'old', text: oldLines[i++]});
+  while (j < newLines.length) out.push({type: 'new', text: newLines[j++]});
+  return out;
+}
+
+function renderDiff(oldText, newText) {
+  return diffLines(oldText, newText).map(line => {
+    if (line.type === 'old') return `<span class="sw-diff-line sw-diff-old">- ${escapeHtml(line.text)}</span>`;
+    if (line.type === 'new') return `<span class="sw-diff-line sw-diff-new">+ ${escapeHtml(line.text)}</span>`;
+    return `<span class="sw-diff-line">  ${escapeHtml(line.text)}</span>`;
+  }).join('');
+}
+
+async function loadScriptVersions(scriptId) {
+  const el = document.querySelector(`[data-version-list="${scriptId}"]`);
+  if (!el || el.dataset.loaded === 'true') return;
+  el.innerHTML = '<span class="text-muted small">Loading versions...</span>';
+  try {
+    const resp = await fetch(`/api/scripts/${scriptId}/history?limit=5`);
+    if (!resp.ok) throw new Error('request failed');
+    const commits = await resp.json();
+    if (!commits.length) {
+      el.innerHTML = '<span class="text-muted small">No local history found.</span>';
+      el.dataset.loaded = 'true';
+      return;
+    }
+    el.innerHTML = commits.map(commit => `
+      <button type="button" class="sw-version-mini-row sw-version-mini-button" data-script-id="${scriptId}" data-version-ref="${escapeHtml(commit.sha || '')}" data-version-label="${escapeHtml(commit.message || commit.short_sha || '')}">
+        <div class="min-w-0">
+          <div class="text-truncate">${escapeHtml(commit.message || commit.short_sha)}</div>
+          <div class="text-muted font-monospace">${escapeHtml(commit.short_sha || '')}</div>
+        </div>
+        ${commit.created_at ? `<span class="text-muted">${new Date(commit.created_at).toLocaleDateString()}</span>` : ''}
+      </button>
+    `).join('');
+    el.dataset.loaded = 'true';
+  } catch (_) {
+    el.innerHTML = '<span class="text-danger small">Failed to load local history.</span>';
+  }
+}
+
+async function openScriptVersion(scriptId, ref, label) {
+  const title = document.getElementById('script-version-title');
+  const refEl = document.getElementById('script-version-ref');
+  const content = document.getElementById('script-version-content');
+  title.textContent = label || 'Script version';
+  refEl.textContent = ref || '';
+  content.textContent = 'Loading version...';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('scriptVersionModal')).show();
+  try {
+    const resp = await fetch(`/api/scripts/${scriptId}/versions/${encodeURIComponent(ref)}`);
+    if (!resp.ok) throw new Error('request failed');
+    const data = await resp.json();
+    refEl.textContent = `${data.ref || ref} · ${data.sha || ''}`;
+    const current = document.querySelector(`[data-code-preview="${scriptId}"]`)?.textContent || '';
+    content.innerHTML = renderDiff(data.content || '', current);
+  } catch (_) {
+    content.textContent = 'Failed to load this script version.';
+  }
+}
+
+document.addEventListener('click', e => {
+  const version = e.target.closest('.sw-version-mini-button');
+  if (version) {
+    openScriptVersion(version.dataset.scriptId, version.dataset.versionRef, version.dataset.versionLabel);
+    return;
+  }
+
+  const item = e.target.closest('.sw-script-list-item');
+  if (!item) return;
+  selectScript(item.dataset.scriptId, {scrollToDetail: isMobileScriptsLayout()});
+});
+
+document.getElementById('script-mobile-back')?.addEventListener('click', () => {
+  clearScriptSelection();
+  document.getElementById('script-filter-input')?.focus();
+});
+
+document.getElementById('script-filter-input')?.addEventListener('input', e => {
+  if (isMobileScriptsLayout()) {
+    clearScriptSelection();
+  }
+  const q = e.currentTarget.value.trim().toLowerCase();
+  let visible = 0;
+  let firstVisible = null;
+  document.querySelectorAll('.sw-script-list-item').forEach(item => {
+    const show = !q || item.dataset.filterText.includes(q);
+    item.style.display = show ? '' : 'none';
+    if (show) {
+      visible += 1;
+      firstVisible = firstVisible || item;
+    }
+  });
+  const empty = document.getElementById('script-filter-empty');
+  if (empty) empty.style.display = visible ? 'none' : '';
+  if (!isMobileScriptsLayout() && firstVisible && !document.querySelector('.sw-script-list-item.active:not([style*="display: none"])')) {
+    selectScript(firstVisible.dataset.scriptId);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const requested = new URLSearchParams(window.location.search).get('script_id');
+  const requestedItem = requested
+    ? Array.from(document.querySelectorAll('.sw-script-list-item')).find(item => item.dataset.scriptId === requested)
+    : null;
+  if (isMobileScriptsLayout() && !requestedItem) {
+    clearScriptSelection();
+    return;
+  }
+  const active = requestedItem || document.querySelector('.sw-script-list-item.active');
+  if (active) {
+    selectScript(active.dataset.scriptId);
+    active.scrollIntoView({block: 'nearest'});
+  }
+});
+</script>
+{% endblock %}

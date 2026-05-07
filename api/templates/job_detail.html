@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }} — ScriptWatch{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center g-2">
+  <div class="col-12 col-sm">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/scripts">Scripts</a></li>
+        {% if job.script %}
+        <li class="breadcrumb-item"><a href="/scripts/{{ job.script.id }}">{{ job.script.name }}</a></li>
+        {% else %}
+        <li class="breadcrumb-item">System Job</li>
+        {% endif %}
+        <li class="breadcrumb-item active">Job #{{ job.id }}</li>
+      </ol>
+    </nav>
+  </div>
+  <div class="col-12 col-sm-auto d-flex align-items-center gap-2" id="job-actions">
+    {% if job.status == "success" %}
+      <span class="badge bg-success fs-6">Success</span>
+    {% elif job.status == "failure" %}
+      <span class="badge bg-danger fs-6">Failed</span>
+    {% elif job.status == "running" %}
+      <span class="badge bg-warning text-dark fs-6">
+        <span class="spinner-border spinner-border-sm me-1"></span>Running
+      </span>
+    {% elif job.status == "timeout" %}
+      <span class="badge bg-warning text-dark fs-6">Timeout</span>
+    {% else %}
+      <span class="badge bg-secondary fs-6">Pending</span>
+    {% endif %}
+    {% if job.status not in ("pending", "running", "cancelling") and job.server and job.script %}
+    <button class="btn btn-outline-warning btn-sm" onclick="replayJob({{ job.id }}, 'current')">
+      <i class="bi bi-arrow-clockwise me-1"></i>{% if job.status == "success" %}Run Again{% else %}Replay{% endif %}
+    </button>
+    {% if job.status in ("failure", "timeout", "cancelled") %}
+    <button class="btn btn-outline-secondary btn-sm" onclick="replayJob({{ job.id }}, 'exact')">
+      <i class="bi bi-file-earmark-code me-1"></i>Exact
+    </button>
+    {% endif %}
+    {% endif %}
+    {% if job.status == "running" %}
+    <button class="btn btn-danger btn-sm" id="stop-btn" onclick="stopJob({{ job.id }})">
+      <i class="bi bi-stop-circle me-1"></i>Stop
+    </button>
+    {% elif job.status == "cancelling" %}
+    <button class="btn btn-outline-danger btn-sm" id="stop-btn" onclick="stopJob({{ job.id }})">
+      <i class="bi bi-stop-circle me-1"></i>Force Stop
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small mb-1">Server</div>
+      <div class="fw-semibold">{{ job.server.name if job.server else "—" }}</div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small mb-1">Triggered By</div>
+      <div class="fw-semibold">{{ job.triggered_by }}</div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small mb-1">Started</div>
+      <div class="fw-semibold" id="job-started">
+        {% if job.started_at %}
+          <span class="relative-time" data-ts="{{ job.started_at }}">{{ job.started_at }}</span>
+        {% else %}Not started{% endif %}
+      </div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small mb-1">Duration / Exit Code</div>
+      <div class="fw-semibold" id="job-duration">
+        {% if job.duration_seconds is not none %}
+          {{ job.duration_seconds }}s
+          &nbsp;<span class="text-muted">exit {{ job.exit_code }}</span>
+        {% elif job.status in ("pending", "running") %}—
+        {% else %}
+          exit {{ job.exit_code }}
+        {% endif %}
+      </div>
+    </div></div>
+  </div>
+</div>
+
+{% if job.anomaly_detected %}
+<div class="alert alert-warning d-flex align-items-start gap-2" id="job-anomaly">
+  <i class="bi bi-activity flex-shrink-0 mt-1"></i>
+  <div>
+    <div class="fw-semibold">Anomaly detected</div>
+    <div>{{ job.anomaly_reason }}</div>
+  </div>
+</div>
+{% endif %}
+
+{% if job.replayed_from_job_id %}
+<div class="alert alert-info d-flex align-items-start gap-2">
+  <i class="bi bi-arrow-repeat flex-shrink-0 mt-1"></i>
+  <div>
+    Replayed from <a href="/jobs/{{ job.replayed_from_job_id }}">job #{{ job.replayed_from_job_id }}</a>
+    using {{ job.replay_mode or "current" }} mode.
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-terminal me-2"></i>Output</span>
+    {% if job.gitea_sha %}
+    <span class="text-muted font-monospace small">{{ job.gitea_sha[:8] }}</span>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    <pre class="output-log m-0 p-3" id="job-output">{{ job.output or "(no output yet)" }}</pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let jobStatus = "{{ job.status }}";
+const jobId = {{ job.id }};
+const canRetry = {{ "true" if job.server and job.script else "false" }};
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function relTime(ts) {
+  if (!ts) return '—';
+  const diff = Math.floor((Date.now() - new Date(ts + (ts.endsWith('Z') ? '' : 'Z'))) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function durationText(job) {
+  if (job.started_at && job.completed_at) {
+    const seconds = Math.max(0, Math.round((new Date(job.completed_at + 'Z') - new Date(job.started_at + 'Z')) / 1000));
+    return `${seconds}s <span class="text-muted">exit ${escapeHtml(job.exit_code)}</span>`;
+  }
+  if (job.status === 'pending' || job.status === 'running' || job.status === 'cancelling') return '—';
+  return `exit ${escapeHtml(job.exit_code)}`;
+}
+
+function statusBadge(status) {
+  if (status === 'success') return '<span class="badge bg-success fs-6">Success</span>';
+  if (status === 'failure') return '<span class="badge bg-danger fs-6">Failed</span>';
+  if (status === 'running') return '<span class="badge bg-warning text-dark fs-6"><span class="spinner-border spinner-border-sm me-1"></span>Running</span>';
+  if (status === 'timeout') return '<span class="badge bg-warning text-dark fs-6">Timeout</span>';
+  if (status === 'cancelling') return '<span class="badge bg-secondary fs-6">Cancelling…</span>';
+  if (status === 'cancelled') return '<span class="badge bg-secondary fs-6">Cancelled</span>';
+  return '<span class="badge bg-secondary fs-6">Pending</span>';
+}
+
+function renderJob(job) {
+  jobStatus = job.status;
+  const pre = document.getElementById("job-output");
+  pre.textContent = job.output || "(no output yet)";
+
+  document.getElementById("job-started").innerHTML = job.started_at
+    ? `<span class="relative-time" data-ts="${escapeHtml(job.started_at)}">${relTime(job.started_at)}</span>`
+    : 'Not started';
+  document.getElementById("job-duration").innerHTML = durationText(job);
+
+  const actions = document.getElementById("job-actions");
+  let html = statusBadge(job.status);
+  if (!["pending", "running", "cancelling"].includes(job.status) && canRetry) {
+    const label = job.status === "success" ? "Run Again" : "Replay";
+    html += ` <button class="btn btn-outline-warning btn-sm" onclick="replayJob(${job.id}, 'current')"><i class="bi bi-arrow-clockwise me-1"></i>${label}</button>`;
+    if (job.status === "failure" || job.status === "timeout" || job.status === "cancelled") {
+      html += ` <button class="btn btn-outline-secondary btn-sm" onclick="replayJob(${job.id}, 'exact')"><i class="bi bi-file-earmark-code me-1"></i>Exact</button>`;
+    }
+  }
+  if (job.status === "running" || job.status === "pending") {
+    html += ` <button class="btn btn-danger btn-sm" id="stop-btn" onclick="stopJob(${job.id})"><i class="bi bi-stop-circle me-1"></i>Stop</button>`;
+  } else if (job.status === "cancelling") {
+    html += ` <button class="btn btn-outline-danger btn-sm" id="stop-btn" onclick="stopJob(${job.id})"><i class="bi bi-stop-circle me-1"></i>Force Stop</button>`;
+  }
+  actions.innerHTML = html;
+}
+
+async function replayJob(jobId, mode) {
+  const resp = await fetch(`/api/jobs/${jobId}/replay`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({mode}),
+  });
+  if (resp.ok) {
+    const job = await resp.json();
+    window.location.href = `/jobs/${job.id}`;
+  } else {
+    swToast("Failed to replay job", "danger");
+  }
+}
+
+async function stopJob(jobId) {
+  const btn = document.getElementById("stop-btn");
+  const prevHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass me-1"></i>Stopping…'; }
+  const resp = await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+  if (resp.ok) {
+    renderJob(await resp.json());
+    pollOutput();
+  } else {
+    swToast("Failed to stop job", "danger");
+    if (btn) { btn.disabled = false; btn.innerHTML = prevHtml; }
+  }
+}
+
+function pollOutput() {
+  fetch(`/api/jobs/${jobId}`)
+    .then(r => r.json())
+    .then(data => {
+      renderJob(data);
+      if (data.status === "pending" || data.status === "running" || data.status === "cancelling") {
+        setTimeout(pollOutput, 3000);
+      }
+    })
+    .catch(() => setTimeout(pollOutput, 5000));
+}
+
+if (jobStatus === "pending" || jobStatus === "running" || jobStatus === "cancelling") {
+  setTimeout(pollOutput, 3000);
+}
+</script>
+{% endblock %}

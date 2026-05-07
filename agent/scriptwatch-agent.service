@@ -1,0 +1,16 @@
+[Unit]
+Description=ScriptWatch Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/scriptwatch-agent
+EnvironmentFile=/etc/scriptwatch.env
+ExecStart=/usr/bin/python3 /opt/scriptwatch-agent/agent.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
