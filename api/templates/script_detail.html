@@ -39,11 +39,11 @@
         </div>
       </div>
       <div class="card-body p-0">
+        <div class="alert m-2 d-none" id="validation-result"></div>
         <div id="editor-container"></div>
         <input type="hidden" id="script-content" name="content" value="{{ content | e }}">
       </div>
     </div>
-    <div class="alert mt-2 mb-0 d-none" id="validation-result"></div>
 
     {% if script and script.jobs %}
     <div class="card mt-2 sw-recent-runs">
@@ -402,7 +402,7 @@ document.getElementById('validate-script-btn')?.addEventListener('click', async 
     body: JSON.stringify({content: cm.getValue()}),
   });
   const result = await resp.json();
-  box.className = `alert mt-2 mb-0 ${result.valid ? 'alert-success' : 'alert-danger'}`;
+  box.className = `alert m-2 ${result.valid ? 'alert-success' : 'alert-danger'}`;
   const warnings = (result.warnings || []).map(w => `<li>${escapeHtml(w)}</li>`).join('');
   box.innerHTML = `
     <div class="fw-semibold">${result.valid ? 'Shell syntax looks valid.' : 'Shell syntax has errors.'}</div>
