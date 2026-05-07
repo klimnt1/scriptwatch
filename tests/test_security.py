@@ -113,7 +113,7 @@ def test_settings_shows_agent_onboarding_after_password_is_set(tmp_path):
     assert resp.status_code == 200
     assert b"Agent onboarding" in resp.data
     assert b"test-agent-token" in resp.data
-    assert b"SCRIPTWATCH_AGENT_TOKEN=test-agent-token" in resp.data
+    assert b"Agent environment" not in resp.data
 
 
 def test_settings_can_enable_mfa_and_require_code_on_next_login(tmp_path):
