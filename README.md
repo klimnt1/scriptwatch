@@ -35,14 +35,22 @@ ghcr.io/klimnt1/scriptwatch:latest
 
 1. In Portainer, go to **Containers → Add container** (or **Stacks → Add stack → Repository**).
 2. Set the image above.
-2. Under **Environment variables**, set at minimum:
+2. Under **Environment variables**, click **Advanced mode** and paste:
+
+   ```env
+   AGENT_TOKEN=replace-with-random-value
+   SECRET_KEY=replace-with-different-random-value
+   BASE_URL=http://your-server-ip:8080
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=
+   ```
 
    | Variable | Description |
    |---|---|
-   | `AGENT_TOKEN` | Shared secret agents use to authenticate — generate a random value |
-   | `SECRET_KEY` | Signs browser session cookies — generate a different random value |
-   | `BASE_URL` | Public URL of your ScriptWatch instance, e.g. `http://192.168.1.10:8080` |
-   | `ADMIN_USERNAME` | Login username for the web UI (default: `admin`) |
+   | `AGENT_TOKEN` | Shared secret agents use to authenticate |
+   | `SECRET_KEY` | Signs browser session cookies |
+   | `BASE_URL` | Public URL of your ScriptWatch instance |
+   | `ADMIN_USERNAME` | Login username (default: `admin`) |
    | `ADMIN_PASSWORD` | Password for the web UI (leave blank to disable auth) |
 
    Discord and ntfy can be configured from **Settings** inside the app — no env var needed.
