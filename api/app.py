@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import struct
 import time
 from datetime import timezone as _utc
@@ -18,7 +19,12 @@ _AGENT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "agent")
 _INSTALL_SH_PATH = os.path.join(_AGENT_DIR, "install.sh")
 
 
+_SERVER_NAME_RE = re.compile(r'^[A-Za-z0-9._-]{1,63}$')
+
+
 def _build_install_script(base_url, agent_token, server_name=None):
+    if server_name and not _SERVER_NAME_RE.match(server_name):
+        raise ValueError(f"Invalid server_name: {server_name!r}")
     with open(_INSTALL_SH_PATH) as f:
         script = f.read()
     # Redirect agent.py download to ScriptWatch so installs are self-contained.
@@ -283,6 +289,8 @@ def _install_optional_admin_auth(app):
         base_url = (app.config.get("BASE_URL") or request.url_root).rstrip("/")
         agent_token = app.config.get("AGENT_TOKEN", "")
         server_name = request.args.get("name", "").strip() or None
+        if server_name and not _SERVER_NAME_RE.match(server_name):
+            return Response("Invalid server name.", status=400, mimetype="text/plain")
         script = _build_install_script(base_url, agent_token, server_name=server_name)
         return Response(
             script,
@@ -298,6 +306,8 @@ def _install_optional_admin_auth(app):
 
     @app.get("/install/<server_name>")
     def agent_install_bootstrap(server_name):
+        if not _SERVER_NAME_RE.match(server_name):
+            return Response("Invalid server name.", status=400, mimetype="text/plain")
         base_url = (app.config.get("BASE_URL") or request.url_root).rstrip("/")
         agent_token = app.config.get("AGENT_TOKEN", "")
         script = _build_install_script(base_url, agent_token, server_name=server_name)
@@ -420,10 +430,10 @@ def _warn_insecure_config(app):
     if app.config.get("TESTING"):
         return
     warnings = []
-    if app.config.get("AGENT_TOKEN") in ("", "changeme"):
-        warnings.append("AGENT_TOKEN is empty or still set to the default.")
-    if app.config.get("SECRET_KEY") in ("", "dev-secret-change-me"):
-        warnings.append("SECRET_KEY is empty or still set to the development default.")
+    if not app.config.get("AGENT_TOKEN"):
+        warnings.append("AGENT_TOKEN is not set. Agent authentication is disabled.")
+    if not app.config.get("SECRET_KEY"):
+        warnings.append("SECRET_KEY is not set.")
     if not (app.config.get("ADMIN_PASSWORD") or app.config.get("ADMIN_TOKEN")):
         warnings.append("Admin authentication is disabled; set ADMIN_PASSWORD or ADMIN_TOKEN to enable it.")
     for msg in warnings:

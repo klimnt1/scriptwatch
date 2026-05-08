@@ -1,4 +1,5 @@
 import os
+import secrets
 
 
 class Config:
@@ -13,8 +14,8 @@ class Config:
     GITEA_TOKEN = os.environ.get("GITEA_TOKEN", "")
     GITEA_REPO_OWNER = os.environ.get("GITEA_REPO_OWNER", "")
     GITEA_REPO_NAME = os.environ.get("GITEA_REPO_NAME", "")
-    AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "changeme")
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    AGENT_TOKEN = os.environ.get("AGENT_TOKEN") or None
+    SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
     ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")

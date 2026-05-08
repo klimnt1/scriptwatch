@@ -18,9 +18,11 @@ def get_gitea_client():
 def require_agent_token(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        configured_token = current_app.config.get("AGENT_TOKEN") or ""
+        if not configured_token:
+            return jsonify({"error": "unauthorized"}), 401
         auth = request.headers.get("Authorization", "")
-        expected = f"Bearer {current_app.config['AGENT_TOKEN']}"
-        if not hmac.compare_digest(auth, expected):
+        if not hmac.compare_digest(auth, f"Bearer {configured_token}"):
             return jsonify({"error": "unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated
