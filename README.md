@@ -53,6 +53,12 @@ ghcr.io/klimnt1/scriptwatch:latest
 To generate secret values:
 
 ```bash
+openssl rand -hex 32
+```
+
+Or with Python:
+
+```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
