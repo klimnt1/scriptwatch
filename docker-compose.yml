@@ -4,7 +4,8 @@ services:
     container_name: scriptwatch
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DATA_DIR: /app/data
       DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/scriptwatch.db}
