@@ -26,11 +26,15 @@ Open `http://your-server-ip:8080` and go to **Settings** to set an admin passwor
 
 ---
 
-### Portainer (deploy from GitHub)
+### Portainer
 
-**Image:** `ghcr.io/klimnt1/scriptwatch:latest`
+**Image:**
+```
+ghcr.io/klimnt1/scriptwatch:latest
+```
 
-1. Create a new stack using the **Repository** build method, pointing to this repo.
+1. In Portainer, go to **Containers → Add container** (or **Stacks → Add stack → Repository**).
+2. Set the image above.
 2. Under **Environment variables**, set at minimum:
 
    | Variable | Description |
