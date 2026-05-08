@@ -237,6 +237,34 @@ def _install_optional_admin_auth(app):
         flash("Notification settings saved.", "success")
         return redirect(url_for("settings_page"))
 
+    @app.post("/settings/notifications/test")
+    def settings_notifications_test():
+        from .services.notifier import _notify_discord, _notify_ntfy
+        channel = request.form.get("channel")
+        title = "🔔 ScriptWatch test notification"
+        body = "Your notification settings are working correctly."
+        if channel == "discord":
+            url = _get_setting("discord_webhook_url")
+            if not url:
+                flash("No Discord webhook URL saved. Save one first.", "warning")
+            else:
+                try:
+                    _notify_discord(url, title, body)
+                    flash("Test notification sent to Discord.", "success")
+                except Exception as e:
+                    flash(f"Discord test failed: {e}", "danger")
+        elif channel == "ntfy":
+            url = _get_setting("ntfy_url")
+            if not url:
+                flash("No ntfy URL saved. Save one first.", "warning")
+            else:
+                try:
+                    _notify_ntfy(url, _get_setting("ntfy_token"), title, body)
+                    flash("Test notification sent to ntfy.", "success")
+                except Exception as e:
+                    flash(f"ntfy test failed: {e}", "danger")
+        return redirect(url_for("settings_page"))
+
     @app.post("/settings/password")
     def settings_password():
         current_password = request.form.get("current_password", "")

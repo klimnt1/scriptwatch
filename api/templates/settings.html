@@ -128,12 +128,30 @@
             <label class="form-label small text-secondary" for="ntfy-token">ntfy token <span class="text-secondary fw-normal">(optional)</span></label>
             <input class="form-control font-monospace" id="ntfy-token" type="password" name="ntfy_token" value="{{ ntfy_token }}" autocomplete="off">
           </div>
-          <div>
+          <div class="d-flex gap-2 flex-wrap">
             <button class="btn btn-success" type="submit">
               <i class="bi bi-bell me-1"></i>Save notifications
             </button>
           </div>
         </form>
+        <div class="d-flex gap-2 flex-wrap mt-2">
+          {% if discord_webhook_url %}
+          <form method="post" action="/settings/notifications/test">
+            <input type="hidden" name="channel" value="discord">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">
+              <i class="bi bi-send me-1"></i>Test Discord
+            </button>
+          </form>
+          {% endif %}
+          {% if ntfy_url %}
+          <form method="post" action="/settings/notifications/test">
+            <input type="hidden" name="channel" value="ntfy">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">
+              <i class="bi bi-send me-1"></i>Test ntfy
+            </button>
+          </form>
+          {% endif %}
+        </div>
       </div>
     </div>
 
