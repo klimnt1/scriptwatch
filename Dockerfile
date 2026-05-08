@@ -3,8 +3,6 @@ WORKDIR /app
 ENV DATA_DIR=/app/data \
     DATABASE_URL=sqlite:////app/data/scriptwatch.db \
     SCRIPT_STORE_DIR=/app/data/script-store \
-    AGENT_TOKEN=changeme \
-    SECRET_KEY=dev-secret-change-me \
     ADMIN_USERNAME=admin \
     ADMIN_PASSWORD= \
     ADMIN_TOKEN= \

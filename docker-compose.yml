@@ -1,6 +1,6 @@
 services:
   api:
-    build: .
+    image: ghcr.io/klimnt1/scriptwatch:latest
     container_name: scriptwatch
     restart: unless-stopped
     env_file:
