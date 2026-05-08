@@ -12,7 +12,7 @@ NC='\033[0m'
 INSTALL_DIR="/opt/scriptwatch-agent"
 ENV_FILE="/etc/scriptwatch.env"
 SERVICE_FILE="/etc/systemd/system/scriptwatch-agent.service"
-AGENT_URL="https://gitea.plexusprime.net/adrianoropesa/scriptwatch/raw/branch/main/agent/agent.py"
+AGENT_URL="https://raw.githubusercontent.com/klimnt1/scriptwatch/main/agent/agent.py"
 
 print_header() {
     echo ""
@@ -134,7 +134,7 @@ ok "Directory ready"
 
 step "Downloading agent.py"
 if curl -fsSL "$AGENT_URL" -o "$INSTALL_DIR/agent.py" 2>/dev/null; then
-    ok "Downloaded from Gitea"
+    ok "Downloaded from GitHub"
 elif [ -f "$(dirname "$0")/agent.py" ]; then
     cp "$(dirname "$0")/agent.py" "$INSTALL_DIR/agent.py"
     ok "Copied from local installer directory"

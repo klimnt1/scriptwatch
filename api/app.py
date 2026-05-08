@@ -29,7 +29,7 @@ def _build_install_script(base_url, agent_token, server_name=None):
         script = f.read()
     # Redirect agent.py download to ScriptWatch so installs are self-contained.
     script = script.replace(
-        'AGENT_URL="https://gitea.plexusprime.net/adrianoropesa/scriptwatch/raw/branch/main/agent/agent.py"',
+        'AGENT_URL="https://raw.githubusercontent.com/klimnt1/scriptwatch/main/agent/agent.py"',
         f'AGENT_URL="{base_url}/install/agent.py"',
     )
     script = script.replace(
