@@ -38,6 +38,7 @@ Open `http://your-server-ip:8080` and go to **Settings** to set an admin passwor
    | `AGENT_TOKEN` | Shared secret agents use to authenticate — generate a random value |
    | `SECRET_KEY` | Signs browser session cookies — generate a different random value |
    | `BASE_URL` | Public URL of your ScriptWatch instance, e.g. `http://192.168.1.10:8080` |
+   | `ADMIN_USERNAME` | Login username for the web UI (default: `admin`) |
    | `ADMIN_PASSWORD` | Password for the web UI (leave blank to disable auth) |
 
    Discord and ntfy can be configured from **Settings** inside the app — no env var needed.
