@@ -1,166 +1,71 @@
 # ScriptWatch Standalone
 
-ScriptWatch Standalone manages shell scripts, schedules jobs, and dispatches them to lightweight agents without requiring PostgreSQL or Gitea.
-
-Everything lives locally:
-
-- SQLite database: `./data/scriptwatch.db`
-- Script source and version snapshots: `./data/script-store`
-- Agent token and app secrets: your local `.env`
+Manages shell scripts, schedules jobs, and dispatches them to lightweight agents. No PostgreSQL or Gitea required — everything is stored locally in SQLite.
 
 ## Quick Start
 
 ### Docker Compose
 
-Use this path when you have the repo files on the machine running Docker. The compose file uses `build: .`, so Docker needs to see this repo's `Dockerfile`.
+```bash
+./tools/setup-env.sh   # generates AGENT_TOKEN and SECRET_KEY automatically
+```
 
-1. Create an environment file with fresh secrets and setup values:
+Edit `.env` and set your URL:
 
-   ```bash
-   ./tools/setup-env.sh
-   ```
+```env
+BASE_URL=http://your-server-ip:8080
+```
 
-   If you prefer a quick start, you can also copy `.env.example`:
+Then start:
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+docker compose up -d
+```
 
-2. Edit `.env` and set your app URL and any optional values:
+Open `http://your-server-ip:8080` and go to **Settings** to set an admin password.
 
-   ```env
-   BASE_URL=http://your-server-ip:8080
-   ```
+---
 
-   Keep Docker container paths as `/app/data`; the compose file maps that to `./data` on the host.
+### Portainer (deploy from GitHub)
 
-3. Start the app:
+1. Create a new stack using the **Repository** build method, pointing to this repo.
+2. Under **Environment variables**, set at minimum:
 
-   ```bash
-   docker compose up -d
-   ```
+   | Variable | Description |
+   |---|---|
+   | `AGENT_TOKEN` | Shared secret agents use to authenticate — generate a random value |
+   | `SECRET_KEY` | Signs browser session cookies — generate a different random value |
+   | `BASE_URL` | Public URL of your ScriptWatch instance, e.g. `http://192.168.1.10:8080` |
+   | `ADMIN_PASSWORD` | Password for the web UI (leave blank to disable auth) |
 
-4. Open:
+   Discord and ntfy can be configured from **Settings** inside the app — no env var needed.
 
-   ```text
-   http://your-server-ip:8080
-   ```
+3. Add a volume bind mount: **Container** `/app/data` → **Host** `/opt/scriptwatch/data`
+4. Deploy and open `http://your-server-ip:8080`.
 
-5. Go to Settings to set an admin password and copy the agent install command.
-
-### Portainer
-
-Use this path when you already have a ScriptWatch image available and want to create the container from Portainer's **Containers > Add container** screen.
-
-1. Fill in the top section:
-
-   ```text
-   Name: scriptwatch
-   Image: your-registry.example.com/your-user/scriptwatch-standalone:latest
-   ```
-
-   If the image is only local on the Docker host, use the local image name, for example `scriptwatch-standalone:latest`, and turn off **Always pull the image**.
-
-2. Under **Network ports configuration**, add one port mapping:
-
-   ```text
-   Host port: 8080
-   Container port: 8080
-   Protocol: TCP
-   ```
-
-   The image exposes port `8080`, but Portainer does not always publish exposed ports automatically. Add this mapping explicitly so the Web UI is reachable from your browser.
-
-3. Under **Advanced container settings > Volumes**, add a bind mount:
-
-   ```text
-   Container: /app/data
-   Host: /opt/scriptwatch/data
-   ```
-
-   You can use another host path if you prefer. This folder is the important backup target because it contains the SQLite database and local script snapshots.
-
-   Do not skip this mapping. ScriptWatch stores its runtime data inside the container at:
-
-   ```text
-   /app/data/scriptwatch.db
-   /app/data/script-store
-   ```
-
-   If `/app/data` is not mapped to a host folder, removing or recreating the container can remove your scripts, settings, job history, and local script versions. With the bind mount in place, you can recreate the container and keep the data.
-
-4. Under **Advanced container settings > Env**, review these variables.
-
-   Newer images include these environment variables as editable defaults in Portainer. If any are missing, add them manually:
-
-   ```env
-   DATA_DIR=/app/data
-   DATABASE_URL=sqlite:////app/data/scriptwatch.db
-   SCRIPT_STORE_DIR=/app/data/script-store
-   AGENT_TOKEN=replace-with-a-long-random-value
-   SECRET_KEY=replace-with-a-different-long-random-value
-   ADMIN_USERNAME=admin
-   ADMIN_PASSWORD=
-   ADMIN_TOKEN=
-   BASE_URL=http://your-server-ip:8080
-   NTFY_URL=
-   NTFY_TOKEN=
-   DISCORD_WEBHOOK_URL=
-   MISSED_RUN_GRACE_MINUTES=15
-   JOB_RETENTION_DAYS=30
-   ```
-
-   Replace `AGENT_TOKEN`, `SECRET_KEY`, and `BASE_URL` before deploying. Leave the `/app/data` paths as-is unless you also change the volume mapping.
-
-5. Under **Advanced container settings > Restart policy**, choose **Unless stopped**.
-
-6. Deploy the container and open:
-
-   ```text
-   http://your-server-ip:8080
-   ```
-
-7. Go to Settings to set an admin password and copy the agent install command.
-
-To safely update or recreate the container in Portainer:
-
-1. Open the existing `scriptwatch` container.
-2. Confirm **Volumes** shows `/app/data` mapped to a host path, such as `/opt/scriptwatch/data`.
-3. Use **Duplicate/Edit** or recreate the container with the same volume mapping.
-4. Keep the same `AGENT_TOKEN` if existing agents are already installed. Changing it requires updating every agent.
-5. Keep the same `SECRET_KEY` unless you intentionally want to invalidate existing browser sessions.
-
-You can generate secret values on any machine with Python:
+To generate secret values:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-If Python is not available, OpenSSL also works:
+> **Keep the same `AGENT_TOKEN`** when recreating the container — changing it requires reinstalling every agent.
 
-```bash
-openssl rand -base64 48
-```
+---
 
-### Agent Installs
+### Agent Install
 
-After the API is running, create a server in ScriptWatch and use the install command shown in Settings. The command includes your `BASE_URL` and `AGENT_TOKEN`, so set those before installing agents.
+After the server is running, go to **Settings** and copy the agent install command. Run it with `sudo` on each target machine.
 
-For Unraid agents, the template at `agent/scriptwatch-agent.xml` can be used on each target server. Set:
+For Unraid, use the template at `agent/scriptwatch-agent.xml` and set `SCRIPTWATCH_API_URL`, `SCRIPTWATCH_SERVER_NAME`, and `SCRIPTWATCH_AGENT_TOKEN`.
 
-- `SCRIPTWATCH_API_URL` to the central ScriptWatch URL.
-- `SCRIPTWATCH_SERVER_NAME` to the exact server name created in the dashboard.
-- `SCRIPTWATCH_AGENT_TOKEN` to the API container's `AGENT_TOKEN`.
+---
 
-## Sharing
+## Data & Backups
 
-Do not share your `.env` file. Each install should generate its own `AGENT_TOKEN`, `SECRET_KEY`, and admin password.
-
-Back up the persistent data directory, not the container:
+Back up the data directory, not the container:
 
 - Docker Compose: `./data`
-- Portainer: the host path mapped to `/app/data`, for example `/opt/scriptwatch/data`
+- Portainer: the host path mapped to `/app/data` (e.g. `/opt/scriptwatch/data`)
 
-## Notes
-
-The app keeps the original internal `gitea_path`/`gitea_sha` names for compatibility, but this standalone edition stores script content and history on disk under `./data/script-store`.
+Do not share your `.env`. Each install should have its own `AGENT_TOKEN` and `SECRET_KEY`.

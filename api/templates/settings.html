@@ -111,6 +111,32 @@
     </div>
   </div>
   <div class="col-12 col-xl-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="mb-1">Notifications</h5>
+        <div class="text-secondary small mb-3">Alert destinations for job failures and missed runs.</div>
+        <form method="post" action="/settings/notifications" class="d-grid gap-3">
+          <div>
+            <label class="form-label small text-secondary" for="discord-webhook-url">Discord webhook URL</label>
+            <input class="form-control" id="discord-webhook-url" type="url" name="discord_webhook_url" value="{{ discord_webhook_url }}" placeholder="https://discord.com/api/webhooks/…">
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="ntfy-url">ntfy topic URL</label>
+            <input class="form-control" id="ntfy-url" type="url" name="ntfy_url" value="{{ ntfy_url }}" placeholder="https://ntfy.sh/your-topic">
+          </div>
+          <div>
+            <label class="form-label small text-secondary" for="ntfy-token">ntfy token <span class="text-secondary fw-normal">(optional)</span></label>
+            <input class="form-control font-monospace" id="ntfy-token" type="password" name="ntfy_token" value="{{ ntfy_token }}" autocomplete="off">
+          </div>
+          <div>
+            <button class="btn btn-success" type="submit">
+              <i class="bi bi-bell me-1"></i>Save notifications
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-body">
         <div class="d-flex align-items-start justify-content-between gap-3 mb-3">

@@ -212,7 +212,7 @@ def _install_optional_admin_auth(app):
     def settings_page():
         pending_secret = session.get("pending_mfa_secret")
         base_url = (app.config.get("BASE_URL") or request.url_root).rstrip("/")
-        agent_token = app.config.get("AGENT_TOKEN", "")
+        agent_token = app.config.get("AGENT_TOKEN") or ""
         return render_template(
             "settings.html",
             admin_username=app.config.get("ADMIN_USERNAME", "admin"),
@@ -222,9 +222,20 @@ def _install_optional_admin_auth(app):
             pending_secret=pending_secret,
             provisioning_uri=_totp_uri(pending_secret) if pending_secret else "",
             agent_token=agent_token,
-            agent_token_is_default=agent_token in ("", "changeme"),
+            agent_token_is_default=not agent_token,
             agent_base_url=base_url,
+            discord_webhook_url=_get_setting("discord_webhook_url"),
+            ntfy_url=_get_setting("ntfy_url"),
+            ntfy_token=_get_setting("ntfy_token"),
         )
+
+    @app.post("/settings/notifications")
+    def settings_notifications():
+        _set_setting("discord_webhook_url", request.form.get("discord_webhook_url", "").strip())
+        _set_setting("ntfy_url", request.form.get("ntfy_url", "").strip())
+        _set_setting("ntfy_token", request.form.get("ntfy_token", "").strip())
+        flash("Notification settings saved.", "success")
+        return redirect(url_for("settings_page"))
 
     @app.post("/settings/password")
     def settings_password():

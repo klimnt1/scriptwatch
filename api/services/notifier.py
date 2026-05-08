@@ -5,6 +5,16 @@ import requests
 _ET = ZoneInfo("America/New_York")
 
 
+def _db_setting(key):
+    try:
+        from api.extensions import db
+        from api.models import AppSetting
+        setting = db.session.get(AppSetting, key)
+        return setting.value if setting else None
+    except Exception:
+        return None
+
+
 def _fmt_et(dt):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=_utc.utc)
@@ -48,11 +58,15 @@ def notify_job_result(config, job):
     base_url = config.get("BASE_URL", "").rstrip("/")
     job_url = f"{base_url}/jobs/{job.id}" if base_url else None
 
-    if config.get("DISCORD_WEBHOOK_URL"):
-        _notify_discord(config["DISCORD_WEBHOOK_URL"], title, snippet, job_url, color)
+    discord_url = _db_setting("discord_webhook_url") or config.get("DISCORD_WEBHOOK_URL")
+    ntfy_url = _db_setting("ntfy_url") or config.get("NTFY_URL")
+    ntfy_token = _db_setting("ntfy_token") or config.get("NTFY_TOKEN")
 
-    if config.get("NTFY_URL"):
-        _notify_ntfy(config, title, snippet, job_url, ntfy_tags, ntfy_priority)
+    if discord_url:
+        _notify_discord(discord_url, title, snippet, job_url, color)
+
+    if ntfy_url:
+        _notify_ntfy(ntfy_url, ntfy_token, title, snippet, job_url, ntfy_tags, ntfy_priority)
 
 
 def _notify_discord(webhook_url, title, snippet, job_url=None, color=0x95a5a6):
@@ -69,7 +83,7 @@ def _notify_discord(webhook_url, title, snippet, job_url=None, color=0x95a5a6):
         pass
 
 
-def _notify_ntfy(config, title, snippet, job_url=None, tags="bell", priority="default"):
+def _notify_ntfy(ntfy_url, ntfy_token, title, snippet, job_url=None, tags="bell", priority="default"):
     headers = {
         "Title": title,
         "Tags": tags,
@@ -77,10 +91,10 @@ def _notify_ntfy(config, title, snippet, job_url=None, tags="bell", priority="de
     }
     if job_url:
         headers["Click"] = job_url
-    if config.get("NTFY_TOKEN"):
-        headers["Authorization"] = f"Bearer {config['NTFY_TOKEN']}"
+    if ntfy_token:
+        headers["Authorization"] = f"Bearer {ntfy_token}"
     try:
-        requests.post(config["NTFY_URL"], data=snippet.encode("utf-8"), headers=headers, timeout=5)
+        requests.post(ntfy_url, data=snippet.encode("utf-8"), headers=headers, timeout=5)
     except Exception:
         pass
 
@@ -90,8 +104,12 @@ def notify_missed_run(config, script, server, expected_at):
     title = f"⚠️ Missed run: {script.name} on {server_name}"
     body = f"Expected at {_fmt_et(expected_at)} — no job was created."
 
-    if config.get("DISCORD_WEBHOOK_URL"):
-        _notify_discord(config["DISCORD_WEBHOOK_URL"], title, body, job_url=None, color=0xf39c12)
+    discord_url = _db_setting("discord_webhook_url") or config.get("DISCORD_WEBHOOK_URL")
+    ntfy_url = _db_setting("ntfy_url") or config.get("NTFY_URL")
+    ntfy_token = _db_setting("ntfy_token") or config.get("NTFY_TOKEN")
 
-    if config.get("NTFY_URL"):
-        _notify_ntfy(config, title, body, job_url=None, tags="warning", priority="high")
+    if discord_url:
+        _notify_discord(discord_url, title, body, job_url=None, color=0xf39c12)
+
+    if ntfy_url:
+        _notify_ntfy(ntfy_url, ntfy_token, title, body, job_url=None, tags="warning", priority="high")
