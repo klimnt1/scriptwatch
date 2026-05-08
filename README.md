@@ -28,6 +28,8 @@ Open `http://your-server-ip:8080` and go to **Settings** to set an admin passwor
 
 ### Portainer (deploy from GitHub)
 
+**Image:** `ghcr.io/klimnt1/scriptwatch:latest`
+
 1. Create a new stack using the **Repository** build method, pointing to this repo.
 2. Under **Environment variables**, set at minimum:
 
