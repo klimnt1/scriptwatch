@@ -80,6 +80,15 @@ Use this path when you already have a ScriptWatch image available and want to cr
 
    You can use another host path if you prefer. This folder is the important backup target because it contains the SQLite database and local script snapshots.
 
+   Do not skip this mapping. ScriptWatch stores its runtime data inside the container at:
+
+   ```text
+   /app/data/scriptwatch.db
+   /app/data/script-store
+   ```
+
+   If `/app/data` is not mapped to a host folder, removing or recreating the container can remove your scripts, settings, job history, and local script versions. With the bind mount in place, you can recreate the container and keep the data.
+
 4. Under **Advanced container settings > Env**, review these variables.
 
    Newer images include these environment variables as editable defaults in Portainer. If any are missing, add them manually:
@@ -112,6 +121,14 @@ Use this path when you already have a ScriptWatch image available and want to cr
    ```
 
 7. Go to Settings to set an admin password and copy the agent install command.
+
+To safely update or recreate the container in Portainer:
+
+1. Open the existing `scriptwatch` container.
+2. Confirm **Volumes** shows `/app/data` mapped to a host path, such as `/opt/scriptwatch/data`.
+3. Use **Duplicate/Edit** or recreate the container with the same volume mapping.
+4. Keep the same `AGENT_TOKEN` if existing agents are already installed. Changing it requires updating every agent.
+5. Keep the same `SECRET_KEY` unless you intentionally want to invalidate existing browser sessions.
 
 You can generate secret values on any machine with Python:
 
