@@ -90,3 +90,4 @@ Back up the data directory, not the container:
 - Portainer: the host path mapped to `/app/data` (e.g. `/opt/scriptwatch/data`)
 
 Do not share your `.env`. Each install should have its own `AGENT_TOKEN` and `SECRET_KEY`.
+#test
