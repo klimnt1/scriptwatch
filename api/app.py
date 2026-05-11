@@ -227,6 +227,14 @@ def _install_optional_admin_auth(app):
             discord_webhook_url=_get_setting("discord_webhook_url"),
             ntfy_url=_get_setting("ntfy_url"),
             ntfy_token=_get_setting("ntfy_token"),
+            daily_digest_enabled=_bool_setting("daily_digest_enabled", app.config.get("DAILY_DIGEST_ENABLED", False)),
+            daily_digest_hour=_int_setting("daily_digest_hour", app.config.get("DAILY_DIGEST_HOUR", 8), 0, 23),
+            daily_digest_minute=_int_setting("daily_digest_minute", app.config.get("DAILY_DIGEST_MINUTE", 0), 0, 59),
+            daily_digest_timezone=_get_setting("daily_digest_timezone", app.config.get("DAILY_DIGEST_TIMEZONE", "America/New_York")),
+            daily_digest_lookback_hours=_int_setting("daily_digest_lookback_hours", app.config.get("DAILY_DIGEST_LOOKBACK_HOURS", 24), 1, 168),
+            daily_digest_include_failures=_bool_setting("daily_digest_include_failures", app.config.get("DAILY_DIGEST_INCLUDE_FAILURES", True)),
+            daily_digest_include_anomalies=_bool_setting("daily_digest_include_anomalies", app.config.get("DAILY_DIGEST_INCLUDE_ANOMALIES", True)),
+            daily_digest_include_scripts=_bool_setting("daily_digest_include_scripts", app.config.get("DAILY_DIGEST_INCLUDE_SCRIPTS", True)),
         )
 
     @app.post("/settings/notifications")
@@ -235,6 +243,32 @@ def _install_optional_admin_auth(app):
         _set_setting("ntfy_url", request.form.get("ntfy_url", "").strip())
         _set_setting("ntfy_token", request.form.get("ntfy_token", "").strip())
         flash("Notification settings saved.", "success")
+        return redirect(url_for("settings_page"))
+
+    @app.post("/settings/digest")
+    def settings_digest():
+        timezone = request.form.get("daily_digest_timezone", "").strip() or app.config.get("DAILY_DIGEST_TIMEZONE", "America/New_York")
+        try:
+            ZoneInfo(timezone)
+        except Exception:
+            timezone = "America/New_York"
+
+        _set_setting("daily_digest_enabled", "true" if request.form.get("daily_digest_enabled") else "false")
+        _set_setting("daily_digest_hour", str(_clamp_int(request.form.get("daily_digest_hour"), 8, 0, 23)))
+        _set_setting("daily_digest_minute", str(_clamp_int(request.form.get("daily_digest_minute"), 0, 0, 59)))
+        _set_setting("daily_digest_timezone", timezone)
+        _set_setting("daily_digest_lookback_hours", str(_clamp_int(request.form.get("daily_digest_lookback_hours"), 24, 1, 168)))
+        _set_setting("daily_digest_include_failures", "true" if request.form.get("daily_digest_include_failures") else "false")
+        _set_setting("daily_digest_include_anomalies", "true" if request.form.get("daily_digest_include_anomalies") else "false")
+        _set_setting("daily_digest_include_scripts", "true" if request.form.get("daily_digest_include_scripts") else "false")
+
+        try:
+            from .services.scheduler_tasks import register_daily_digest
+            register_daily_digest(scheduler, app)
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to refresh daily digest scheduler")
+
+        flash("Daily digest settings saved.", "success")
         return redirect(url_for("settings_page"))
 
     @app.post("/settings/notifications/test")
@@ -413,6 +447,30 @@ def _get_setting(key, default=""):
     return setting.value if setting else default
 
 
+def _bool_setting(key, default=False):
+    value = _get_setting(key, None)
+    if value is None or value == "":
+        return bool(default)
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _int_setting(key, default, min_value=None, max_value=None):
+    value = _get_setting(key, default)
+    return _clamp_int(value, default, min_value, max_value)
+
+
+def _clamp_int(value, default, min_value=None, max_value=None):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = int(default)
+    if min_value is not None:
+        value = max(min_value, value)
+    if max_value is not None:
+        value = min(max_value, value)
+    return value
+
+
 def _set_setting(key, value):
     from .models import AppSetting
     setting = db.session.get(AppSetting, key)
@@ -526,11 +584,12 @@ def _sync_server_tags_to_registry():
 def _start_scheduler(app):
     from .models import Script
     from .services.scheduler_tasks import register_script_schedules, register_pruner
-    from .services.scheduler_tasks import register_missed_run_checker
+    from .services.scheduler_tasks import register_daily_digest, register_missed_run_checker
     if not scheduler.running:
         scheduler.start()
     register_pruner(scheduler, app)
     register_missed_run_checker(scheduler, app)
+    register_daily_digest(scheduler, app)
     with app.app_context():
         for script in Script.query.filter(Script.enabled == True).all():
             register_script_schedules(scheduler, script, app)

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import pytz
 from croniter import croniter
-from api.services.notifier import notify_missed_run
+from api.services.notifier import notify_daily_digest, notify_missed_run
 
 
 def parse_schedule(schedule_str):
@@ -176,5 +176,79 @@ def register_missed_run_checker(scheduler, app):
         trigger="interval",
         minutes=5,
         id="missed_run_checker",
+        replace_existing=True,
+    )
+
+
+def _db_setting(key):
+    try:
+        from api.extensions import db
+        from api.models import AppSetting
+        setting = db.session.get(AppSetting, key)
+        return setting.value if setting else None
+    except Exception:
+        return None
+
+
+def _bool_setting(app, key, config_key, default=False):
+    value = _db_setting(key)
+    if value is None or value == "":
+        value = app.config.get(config_key, default)
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _int_setting(app, key, config_key, default, min_value=None, max_value=None):
+    value = _db_setting(key)
+    if value is None or value == "":
+        value = app.config.get(config_key, default)
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = int(default)
+    if min_value is not None:
+        value = max(min_value, value)
+    if max_value is not None:
+        value = min(max_value, value)
+    return value
+
+
+def _daily_digest_timezone(app):
+    tz = _db_setting("daily_digest_timezone") or app.config.get("DAILY_DIGEST_TIMEZONE", "America/New_York")
+    try:
+        pytz.timezone(tz)
+        return tz
+    except Exception:
+        return "America/New_York"
+
+
+def make_daily_digest_sender(app):
+    def send_daily_digest():
+        with app.app_context():
+            notify_daily_digest(app.config)
+    return send_daily_digest
+
+
+def register_daily_digest(scheduler, app):
+    job_id = "daily_digest"
+    existing = scheduler.get_job(job_id)
+    if existing:
+        scheduler.remove_job(job_id)
+
+    with app.app_context():
+        enabled = _bool_setting(app, "daily_digest_enabled", "DAILY_DIGEST_ENABLED", False)
+        hour = _int_setting(app, "daily_digest_hour", "DAILY_DIGEST_HOUR", 8, min_value=0, max_value=23)
+        minute = _int_setting(app, "daily_digest_minute", "DAILY_DIGEST_MINUTE", 0, min_value=0, max_value=59)
+        timezone = _daily_digest_timezone(app)
+
+    if not enabled:
+        return
+
+    scheduler.add_job(
+        func=make_daily_digest_sender(app),
+        trigger="cron",
+        hour=hour,
+        minute=minute,
+        timezone=timezone,
+        id=job_id,
         replace_existing=True,
     )

@@ -116,6 +116,40 @@ def test_settings_shows_agent_onboarding_after_password_is_set(tmp_path):
     assert b"Agent environment" not in resp.data
 
 
+def test_settings_can_save_daily_digest_options(tmp_path):
+    from api.models import AppSetting
+
+    app = _make_app(tmp_path)
+    client = app.test_client()
+
+    client.post("/login", data={"username": "admin", "password": "secret-password"})
+    resp = client.get("/settings")
+    assert resp.status_code == 200
+    assert b"Daily digest" in resp.data
+
+    resp = client.post("/settings/digest", data={
+        "daily_digest_enabled": "true",
+        "daily_digest_hour": "9",
+        "daily_digest_minute": "30",
+        "daily_digest_timezone": "America/Chicago",
+        "daily_digest_lookback_hours": "48",
+        "daily_digest_include_failures": "true",
+        "daily_digest_include_scripts": "true",
+    })
+
+    assert resp.status_code == 302
+    with app.app_context():
+        settings = {s.key: s.value for s in AppSetting.query.all()}
+        assert settings["daily_digest_enabled"] == "true"
+        assert settings["daily_digest_hour"] == "9"
+        assert settings["daily_digest_minute"] == "30"
+        assert settings["daily_digest_timezone"] == "America/Chicago"
+        assert settings["daily_digest_lookback_hours"] == "48"
+        assert settings["daily_digest_include_failures"] == "true"
+        assert settings["daily_digest_include_anomalies"] == "false"
+        assert settings["daily_digest_include_scripts"] == "true"
+
+
 def test_settings_can_enable_mfa_and_require_code_on_next_login(tmp_path):
     app = _make_app(tmp_path)
     client = app.test_client()

@@ -297,6 +297,51 @@ def test_notify_job_result_uses_success_message(app):
         )
 
 
+def test_build_daily_digest_groups_jobs(app):
+    with app.app_context():
+        from api.services.notifier import build_daily_digest
+
+        server = Server(name="digest-srv")
+        db.session.add(server)
+        db.session.flush()
+        script = Script(name="digest-script", gitea_path="scripts/digest.sh", gitea_sha="abc")
+        db.session.add(script)
+        db.session.flush()
+        start = datetime(2026, 5, 10, 8, 0, 0)
+        end = datetime(2026, 5, 11, 8, 0, 0)
+        jobs = [
+            Job(
+                script_id=script.id,
+                server_id=server.id,
+                status="success",
+                completed_at=end - timedelta(hours=2),
+                duration_seconds=60,
+            ),
+            Job(
+                script_id=script.id,
+                server_id=server.id,
+                status="failure",
+                exit_code=1,
+                completed_at=end - timedelta(hours=1),
+                duration_seconds=120,
+                anomaly_detected=True,
+                anomaly_reason="Runtime was unusual.",
+            ),
+        ]
+        db.session.add_all(jobs)
+        db.session.commit()
+
+        title, body = build_daily_digest(jobs, start, end)
+
+        assert title == "ScriptWatch Daily Digest - 2026-05-10"
+        assert "2 completed jobs across 1 server" in body
+        assert "Success: 1" in body
+        assert "Failed: 1" in body
+        assert "- digest-script on digest-srv failure, exit 1" in body
+        assert "Slow/anomalous:" in body
+        assert "- digest-script: 2 total, 1 success, 1 problem" in body
+
+
 def test_server_agent_hash_nullable(app):
     with app.app_context():
         s = Server(name="hash-test-srv")
