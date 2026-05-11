@@ -26,6 +26,8 @@ def test_create_script(mock_gitea, client, app):
         "content": "#!/bin/bash\npg_dump mydb > /backup/mydb.sql",
         "schedule": "0 2 * * *",
         "timeout_seconds": 1800,
+        "notify_on_success": True,
+        "success_notification_message": "Postgres backup finished on {server}",
     })
     assert resp.status_code == 201
     data = resp.get_json()
@@ -33,6 +35,7 @@ def test_create_script(mock_gitea, client, app):
     assert data["gitea_path"] == "scripts/postgres-dump.sh"
     assert data["gitea_sha"] == "sha123"
     assert server_id in data["server_ids"]
+    assert data["success_notification_message"] == "Postgres backup finished on {server}"
 
 
 @patch("api.routes.scripts.get_gitea_client")
@@ -87,9 +90,33 @@ def test_update_script(mock_gitea, client, app):
     resp = client.put(f"/api/scripts/{script_id}", json={
         "content": "#!/bin/bash\necho new",
         "description": "Updated description",
+        "success_notification_message": "Updated success message",
     })
     assert resp.status_code == 200
     assert resp.get_json()["description"] == "Updated description"
+    assert resp.get_json()["success_notification_message"] == "Updated success message"
+
+
+@patch("api.services.gitea.GiteaClient")
+@patch("api.routes.scripts.get_gitea_client")
+def test_script_detail_renders_success_notification_message(mock_gitea, mock_ui_gitea, client, app):
+    mock_gitea.return_value.create_or_update_file.return_value = "sha789"
+    mock_gitea.return_value.get_file.return_value = ("#!/bin/bash\necho ok", "sha789")
+    mock_ui_gitea.return_value.get_file.return_value = ("#!/bin/bash\necho ok", "sha789")
+    create_resp = client.post("/api/scripts/", json={
+        "name": "Notify Me",
+        "content": "#!/bin/bash\necho ok",
+        "notify_on_success": True,
+        "success_notification_message": "Duplicacy summary is ready",
+    })
+    script_id = create_resp.get_json()["id"]
+
+    resp = client.get(f"/scripts/{script_id}")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Success notification message" in html
+    assert "Duplicacy summary is ready" in html
 
 
 @patch("api.routes.scripts.get_gitea_client")

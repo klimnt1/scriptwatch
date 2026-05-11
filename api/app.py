@@ -488,6 +488,7 @@ def _run_migrations(db):
         "ALTER TABLE scripts ADD COLUMN IF NOT EXISTS parameters JSONB DEFAULT '[]'::jsonb",
         "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parameters JSONB DEFAULT '{}'::jsonb",
         "ALTER TABLE scripts ADD COLUMN IF NOT EXISTS notify_on_success BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE scripts ADD COLUMN IF NOT EXISTS success_notification_message TEXT",
         "ALTER TABLE servers ADD COLUMN IF NOT EXISTS agent_hash VARCHAR(64)",
         "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS script_content TEXT",
         "ALTER TABLE jobs ALTER COLUMN script_id DROP NOT NULL",

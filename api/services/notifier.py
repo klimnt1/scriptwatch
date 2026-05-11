@@ -5,6 +5,11 @@ import requests
 _ET = ZoneInfo("America/New_York")
 
 
+class _SafeFormatDict(dict):
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
 def _db_setting(key):
     try:
         from api.extensions import db
@@ -19,6 +24,23 @@ def _fmt_et(dt):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=_utc.utc)
     return dt.astimezone(_ET).strftime("%Y-%m-%d %H:%M ET")
+
+
+def _format_custom_message(template, job, server_name, output):
+    if not template:
+        return None
+    values = _SafeFormatDict({
+        "script": job.script.name if job.script else "",
+        "server": server_name,
+        "status": job.status,
+        "job_id": job.id,
+        "exit_code": "" if job.exit_code is None else job.exit_code,
+        "output": output,
+    })
+    try:
+        return template.format_map(values).strip()
+    except Exception:
+        return template.strip()
 
 
 def notify_job_result(config, job):
@@ -50,10 +72,20 @@ def notify_job_result(config, job):
         ntfy_tags = "rotating_light"
         ntfy_priority = "high"
 
-    output = (job.output or "").strip()
+    raw_output = (job.output or "").strip()
+    output = raw_output
     if len(output) > 500:
         output = "…" + output[-500:]
     snippet = output or "No output captured."
+    if job.status == "success":
+        custom_message = _format_custom_message(
+            getattr(job.script, "success_notification_message", None),
+            job,
+            server_name,
+            raw_output,
+        )
+        if custom_message:
+            snippet = custom_message
 
     base_url = config.get("BASE_URL", "").rstrip("/")
     job_url = f"{base_url}/jobs/{job.id}" if base_url else None

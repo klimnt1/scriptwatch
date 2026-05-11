@@ -51,6 +51,7 @@ def test_script_model(app):
             gitea_path="scripts/postgres-dump.sh",
             schedule="0 2 * * *",
             timeout_seconds=1800,
+            success_notification_message="Backup finished for {server}",
         )
         script.servers.append(server)
         db.session.add(script)
@@ -58,6 +59,7 @@ def test_script_model(app):
         fetched = Script.query.filter_by(name="Postgres Dump").first()
         assert fetched.servers[0].name == "plexusprime2"
         assert fetched.enabled is True
+        assert fetched.to_dict()["success_notification_message"] == "Backup finished for {server}"
 
 
 def test_job_model(app):
@@ -254,6 +256,45 @@ def test_notify_missed_run_discord(app):
             body = mock_post.call_args[1]["json"]
             title = body["embeds"][0]["title"]
             assert "miss" in title.lower() or "missed" in title.lower()
+
+
+def test_notify_job_result_uses_success_message(app):
+    with app.app_context():
+        from unittest.mock import patch, MagicMock
+        from api.services.notifier import notify_job_result
+
+        server = Server(name="notify-success-srv")
+        db.session.add(server)
+        db.session.flush()
+        script = Script(
+            name="notify-success-script",
+            gitea_path="scripts/x.sh",
+            gitea_sha="abc",
+            notify_on_success=True,
+            success_notification_message="{script} is green on {server}: {output}",
+        )
+        db.session.add(script)
+        db.session.flush()
+        job = Job(
+            script_id=script.id,
+            server_id=server.id,
+            status="success",
+            exit_code=0,
+            output="all done",
+        )
+        db.session.add(job)
+        db.session.commit()
+
+        config = {"DISCORD_WEBHOOK_URL": "https://discord.example.com/webhook"}
+        with patch("api.services.notifier.requests.post") as mock_post:
+            mock_post.return_value = MagicMock(status_code=204)
+            notify_job_result(config, job)
+
+        assert mock_post.called
+        body = mock_post.call_args[1]["json"]
+        assert body["embeds"][0]["description"] == (
+            "```\nnotify-success-script is green on notify-success-srv: all done\n```"
+        )
 
 
 def test_server_agent_hash_nullable(app):

@@ -131,6 +131,7 @@ def create_script():
         manual_trigger=data.get("manual_trigger", True),
         notify_on_failure=data.get("notify_on_failure", True),
         notify_on_success=data.get("notify_on_success", False),
+        success_notification_message=(data.get("success_notification_message") or "").strip() or None,
         parameters=data.get("parameters") or [],
     )
     script.server_assignments = _build_server_assignments(server_ids, server_schedules)
@@ -225,6 +226,8 @@ def update_script(script_id):
         script.notify_on_failure = data["notify_on_failure"]
     if "notify_on_success" in data:
         script.notify_on_success = data["notify_on_success"]
+    if "success_notification_message" in data:
+        script.success_notification_message = (data.get("success_notification_message") or "").strip() or None
     if "parameters" in data:
         script.parameters = data["parameters"] or []
 

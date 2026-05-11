@@ -75,6 +75,7 @@ class Script(db.Model):
     manual_trigger = db.Column(db.Boolean, default=True)
     notify_on_failure = db.Column(db.Boolean, default=True)
     notify_on_success = db.Column(db.Boolean, default=False)
+    success_notification_message = db.Column(db.Text)
     parameters = db.Column(db.JSON, default=list)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -103,6 +104,7 @@ class Script(db.Model):
             "manual_trigger": self.manual_trigger,
             "notify_on_failure": self.notify_on_failure,
             "notify_on_success": self.notify_on_success,
+            "success_notification_message": self.success_notification_message,
             "parameters": self.parameters or [],
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),

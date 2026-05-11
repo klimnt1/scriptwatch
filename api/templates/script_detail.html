@@ -190,6 +190,11 @@
               <i class="bi bi-bell me-1"></i>Notify on success
             </label>
           </div>
+          <div class="mb-3">
+            <label class="form-label" for="successNotificationMessage">Success notification message</label>
+            <textarea class="form-control" name="success_notification_message" id="successNotificationMessage"
+                      rows="3" placeholder="Optional message body. Supports {script}, {server}, {status}, {job_id}, {exit_code}, {output}.">{{ script.success_notification_message if script and script.success_notification_message else "" }}</textarea>
+          </div>
         </div>
       </div>
 
@@ -450,6 +455,7 @@ document.getElementById("script-form").addEventListener("submit", async function
     enabled: form.enabled.checked,
     notify_on_failure: form.notify_on_failure.checked,
     notify_on_success: form.notify_on_success.checked,
+    success_notification_message: form.success_notification_message.value,
     parameters: collectParams(),
   };
   try {
